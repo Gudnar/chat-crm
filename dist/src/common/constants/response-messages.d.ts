@@ -1,0 +1,22 @@
+export declare const Messages: {
+    INVALID_USER_CREDENTIALS: string;
+    INACTIVE_USER: string;
+    PENDING_USER: string;
+    ELIMINATE_USER: string;
+    NO_PERMISSION_USER: string;
+    USER_BLOCKED: string;
+    SUCCESS_CREATE: string;
+    SUCCESS_UPDATE: string;
+    SUCCESS_DELETE: string;
+    NOT_FOUND: string;
+    CONFLICT: string;
+    AGENTE_NOT_FOUND: string;
+    AGENTE_CREATED: string;
+    AGENTE_UPDATED: string;
+    HERRAMIENTA_NOT_FOUND: string;
+    CONVERSACION_NOT_FOUND: string;
+    CLIENTE_NOT_FOUND: string;
+    CONFIGURACION_SAVED: string;
+    API_KEY_VALID: string;
+    API_KEY_INVALID: string;
+};
