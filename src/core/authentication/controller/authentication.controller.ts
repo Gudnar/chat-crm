@@ -34,7 +34,8 @@ export class AuthenticationController {
 
   @UseGuards(JwtAuthGuard)
   @Post('logout')
-  async logout(): Promise<SuccessResponseDto> {
+  async logout(@Request() req: any): Promise<SuccessResponseDto> {
+    await this.authService.cerrarSesion(req.user.id, req.user.roles ?? [])
     return new SuccessResponseDto(null, 'Sesión cerrada correctamente')
   }
 }

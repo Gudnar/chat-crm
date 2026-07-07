@@ -1,0 +1,30 @@
+import { AgenteHumanoService } from '../service/agente-humano.service';
+import { AsignacionService } from '../service/asignacion.service';
+import { CreateAgenteHumanoDto, UpdateAgenteHumanoDto, CambiarDisponibilidadDto, AsignarConversacionDto, CerrarConversacionDto } from '../dto/agente-humano.dto';
+import { SuccessResponseDto } from '../../../common/dto/success-response.dto';
+export declare class AgenteHumanoController {
+    private readonly agenteHumanoService;
+    private readonly asignacionService;
+    constructor(agenteHumanoService: AgenteHumanoService, asignacionService: AsignacionService);
+    listar(req: any): Promise<SuccessResponseDto>;
+    crear(dto: CreateAgenteHumanoDto, req: any): Promise<SuccessResponseDto>;
+    disponibles(req: any): Promise<SuccessResponseDto>;
+    estadisticasEquipo(req: any): Promise<SuccessResponseDto>;
+    cola(req: any): Promise<SuccessResponseDto>;
+    asignar(dto: AsignarConversacionDto, req: any): Promise<SuccessResponseDto>;
+    asignacionAutomatica(req: any): Promise<SuccessResponseDto>;
+    cerrarConversacion(id: string, dto: CerrarConversacionDto, req: any): Promise<SuccessResponseDto>;
+    devolverAIa(id: string, req: any): Promise<SuccessResponseDto>;
+    miPerfil(req: any): Promise<SuccessResponseDto>;
+    miDisponibilidad(dto: CambiarDisponibilidadDto, req: any): Promise<SuccessResponseDto>;
+    misConversaciones(req: any): Promise<SuccessResponseDto>;
+    obtener(id: string, req: any): Promise<SuccessResponseDto>;
+    actualizar(id: string, dto: UpdateAgenteHumanoDto, req: any): Promise<SuccessResponseDto>;
+    eliminar(id: string, req: any): Promise<SuccessResponseDto>;
+    cambiarDisponibilidad(id: string, dto: CambiarDisponibilidadDto, req: any): Promise<SuccessResponseDto>;
+    estadisticas(id: string, req: any): Promise<SuccessResponseDto>;
+    actividad(id: string, req: any): Promise<SuccessResponseDto>;
+    private esAgenteHumano;
+    private agentePropio;
+    private resolverActor;
+}

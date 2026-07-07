@@ -60,21 +60,35 @@ let ProductoService = ProductoService_1 = class ProductoService extends base_ser
     resolverUrlsImagenes(filenames) {
         return (filenames || []).map(f => this.construirUrlImagen(f));
     }
-    async listar(clienteId, q, categoria) {
-        const base = { clienteId, estado: constants_1.Status.ACTIVE, activo: true };
-        const where = q
-            ? [
-                { ...base, nombre: (0, typeorm_2.ILike)(`%${q}%`) },
-                { ...base, marca: (0, typeorm_2.ILike)(`%${q}%`) },
-                { ...base, modelo: (0, typeorm_2.ILike)(`%${q}%`) },
-                { ...base, descripcion: (0, typeorm_2.ILike)(`%${q}%`) },
-                { ...base, categoria: (0, typeorm_2.ILike)(`%${q}%`) },
-            ]
-            : [base];
-        const items = await this.repo.find({ where, order: { nombre: 'ASC' }, take: 50 });
-        return categoria
-            ? items.filter(p => p.categoria?.toLowerCase() === categoria.toLowerCase())
-            : items;
+    async listar(clienteId, q, categoria, pagina = 1, limite = 25, soloActivos = false) {
+        const qb = this.repo.createQueryBuilder('p')
+            .where('p.clienteId = :clienteId', { clienteId })
+            .andWhere('p.estado = :estado', { estado: constants_1.Status.ACTIVE });
+        if (soloActivos)
+            qb.andWhere('p.activo = true');
+        if (q) {
+            qb.andWhere('(p.nombre ILIKE :q OR p.marca ILIKE :q OR p.modelo ILIKE :q OR p.descripcion ILIKE :q OR p.categoria ILIKE :q)', { q: `%${q}%` });
+        }
+        if (categoria)
+            qb.andWhere('LOWER(p.categoria) = LOWER(:categoria)', { categoria });
+        const total = await qb.getCount();
+        const totalPaginas = Math.max(1, Math.ceil(total / limite));
+        const paginaSegura = Math.min(Math.max(1, pagina), totalPaginas);
+        const items = await qb.clone()
+            .orderBy('p.nombre', 'ASC')
+            .skip((paginaSegura - 1) * limite)
+            .take(limite)
+            .getMany();
+        const activos = await qb.clone().andWhere('p.activo = true').getCount();
+        const catRows = await this.repo.createQueryBuilder('p')
+            .select('DISTINCT p.categoria', 'categoria')
+            .where('p.clienteId = :clienteId AND p.estado = :estado AND p.categoria IS NOT NULL', {
+            clienteId, estado: constants_1.Status.ACTIVE,
+        })
+            .orderBy('categoria', 'ASC')
+            .getRawMany();
+        const categorias = catRows.map(r => r.categoria).filter(Boolean);
+        return { items, total, activos, pagina: paginaSegura, totalPaginas, limite, categorias };
     }
     async obtener(id, clienteId) {
         const p = await this.repo.findOne({ where: { id, clienteId, estado: constants_1.Status.ACTIVE } });
@@ -138,7 +152,8 @@ let ProductoService = ProductoService_1 = class ProductoService extends base_ser
         }
     }
     async buscar(clienteId, termino, categoria) {
-        return this.listar(clienteId, termino, categoria);
+        const { items } = await this.listar(clienteId, termino, categoria, 1, 10, true);
+        return items;
     }
     formatearParaClaude(productos) {
         if (!productos.length) {
@@ -204,65 +219,254 @@ let ProductoService = ProductoService_1 = class ProductoService extends base_ser
         });
         return await workbook.xlsx.writeBuffer();
     }
+    valorCelda(celda) {
+        const v = celda?.value;
+        if (v == null)
+            return '';
+        if (typeof v === 'object') {
+            if (v.richText)
+                return v.richText.map((r) => r.text).join('').trim();
+            if (v.text != null)
+                return String(v.text).trim();
+            if (v.result != null)
+                return String(v.result).trim();
+            if (v instanceof Date)
+                return v.toISOString();
+            return String(v).trim();
+        }
+        return String(v).trim();
+    }
+    parsearPrecio(valor) {
+        if (valor == null || valor === '')
+            return NaN;
+        if (typeof valor === 'number')
+            return valor;
+        if (typeof valor === 'object') {
+            if (typeof valor.result === 'number')
+                return valor.result;
+            const texto = valor.text ?? valor.result ?? (valor.richText ? valor.richText.map((r) => r.text).join('') : '');
+            return this.parsearPrecio(String(texto));
+        }
+        let s = String(valor).replace(/[^\d.,-]/g, '').trim();
+        if (!s)
+            return NaN;
+        if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) {
+            s = s.replace(/\./g, '').replace(',', '.');
+        }
+        else if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) {
+            s = s.replace(/,/g, '');
+        }
+        else {
+            s = s.replace(',', '.');
+        }
+        return parseFloat(s);
+    }
+    normalizarHeader(texto) {
+        return texto
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
     async importarExcel(buffer, clienteId, usuarioCreacion) {
         const workbook = new ExcelJS.Workbook();
         await workbook.xlsx.load(buffer);
         const worksheet = workbook.getWorksheet(1);
         let creados = 0;
+        let actualizados = 0;
         const errores = [];
-        const productosACrear = [];
-        worksheet?.eachRow((row, rowNumber) => {
-            if (rowNumber === 1)
+        if (!worksheet) {
+            return { creados, actualizados, errores: ['El archivo no contiene hojas de cálculo.'] };
+        }
+        let filaHeaders = 0;
+        const mapa = {};
+        const headerOriginal = {};
+        for (let r = 1; r <= Math.min(worksheet.rowCount, 10); r++) {
+            const row = worksheet.getRow(r);
+            const headers = {};
+            const originales = {};
+            row.eachCell((cell, col) => {
+                const original = this.valorCelda(cell);
+                const h = this.normalizarHeader(original);
+                if (h) {
+                    headers[h] = col;
+                    originales[col] = original;
+                }
+            });
+            const keys = Object.keys(headers);
+            const esFilaHeader = (keys.includes('marca') && keys.includes('modelo')) ||
+                (keys.includes('nombre') && keys.includes('precio'));
+            if (esFilaHeader) {
+                filaHeaders = r;
+                Object.assign(mapa, headers);
+                Object.assign(headerOriginal, originales);
+                break;
+            }
+        }
+        if (!filaHeaders) {
+            return {
+                creados,
+                actualizados,
+                errores: ['No se encontró la fila de encabezados. El archivo debe incluir las columnas "Marca" y "Modelo" (o "Nombre" y "Precio").'],
+            };
+        }
+        const col = (...nombres) => {
+            for (const n of nombres) {
+                if (mapa[n] !== undefined)
+                    return mapa[n];
+                const parcial = Object.keys(mapa).find(k => k.includes(n));
+                if (parcial)
+                    return mapa[parcial];
+            }
+            return undefined;
+        };
+        const cols = {
+            nombre: col('nombre'),
+            categoria: col('categoria', 'catego'),
+            marca: col('marca'),
+            modelo: col('modelo'),
+            version: col('version'),
+            descripcion: col('descripcion'),
+            potencia: col('potencia'),
+            asientos: col('asientos', 'asien'),
+            transmision: col('transmision'),
+            traccion: col('traccion', 'tracc'),
+            carroceria: col('carroceria', 'carro'),
+            autonomia: col('autonomia'),
+            bateria: col('bateria'),
+            pantalla: col('pantalla'),
+            precioUsd: col('en mano', 'precio usd', 'precio $'),
+            precioBs: col('precio bs', 'bs'),
+            precio: col('precio'),
+            precioOferta: col('precio oferta', 'oferta'),
+            moneda: col('moneda'),
+            stock: col('stock'),
+            activo: col('activo'),
+        };
+        const esFormatoVehiculos = cols.marca !== undefined && cols.modelo !== undefined && cols.nombre === undefined;
+        const filas = [];
+        worksheet.eachRow((row, rowNumber) => {
+            if (rowNumber <= filaHeaders)
                 return;
             try {
-                const values = row.values;
-                const nombre = values[1];
-                const marca = values[2];
-                const modelo = values[3];
-                const categoria = values[4];
-                const descripcion = values[5];
-                const precio = parseFloat(values[6]);
-                const precioOferta = values[7] ? parseFloat(values[7]) : null;
-                const moneda = values[8] || 'PEN';
-                const stock = values[9] ? parseInt(values[9], 10) : null;
-                const activo = (values[10] || 'Sí').toLowerCase() === 'sí';
-                if (!nombre || isNaN(precio)) {
-                    errores.push(`Fila ${rowNumber}: Nombre y Precio son obligatorios`);
-                    return;
+                const celda = (c) => (c !== undefined ? this.valorCelda(row.getCell(c)) : '');
+                if (esFormatoVehiculos) {
+                    const marca = celda(cols.marca);
+                    const modelo = celda(cols.modelo);
+                    if (!marca && !modelo)
+                        return;
+                    const version = celda(cols.version);
+                    const precioUsd = this.parsearPrecio(cols.precioUsd !== undefined ? row.getCell(cols.precioUsd).value : celda(cols.precio));
+                    if (!marca || !modelo || isNaN(precioUsd)) {
+                        errores.push(`Fila ${rowNumber}: Marca, Modelo y precio "en Mano" son obligatorios`);
+                        return;
+                    }
+                    const precioBs = cols.precioBs !== undefined
+                        ? this.parsearPrecio(row.getCell(cols.precioBs).value)
+                        : NaN;
+                    const specs = [
+                        'potencia', 'asientos', 'transmision', 'traccion',
+                        'carroceria', 'autonomia', 'bateria', 'pantalla',
+                    ];
+                    const partesDescripcion = [];
+                    for (const c of specs) {
+                        const colIdx = cols[c];
+                        const val = celda(colIdx);
+                        if (val && colIdx !== undefined) {
+                            const etiqueta = headerOriginal[colIdx] || String(c);
+                            partesDescripcion.push(`${etiqueta}: ${val}`);
+                        }
+                    }
+                    const descripcion = partesDescripcion.length ? partesDescripcion.join(', ') : null;
+                    const detalles = {};
+                    if (version)
+                        detalles.version = version;
+                    if (!isNaN(precioBs))
+                        detalles.precioBs = precioBs;
+                    filas.push({
+                        rowNumber,
+                        datos: {
+                            nombre: [marca, modelo, version].filter(Boolean).join(' '),
+                            marca,
+                            modelo,
+                            categoria: celda(cols.categoria) || null,
+                            descripcion,
+                            precio: precioUsd,
+                            precioOferta: null,
+                            moneda: 'USD',
+                            stock: null,
+                            activo: true,
+                            detalles,
+                        },
+                    });
                 }
-                productosACrear.push({
-                    nombre,
-                    marca: marca || null,
-                    modelo: modelo || null,
-                    categoria: categoria || null,
-                    descripcion: descripcion || null,
-                    precio,
-                    precioOferta: precioOferta || null,
-                    moneda,
-                    stock: stock || null,
-                    activo,
-                    clienteId,
-                    imagenes: [],
-                    detalles: {},
-                    estado: constants_1.Status.ACTIVE,
-                    transaccion: constants_1.Transacccion.CREAR,
-                    usuarioCreacion,
-                });
+                else {
+                    const nombre = celda(cols.nombre);
+                    const precio = this.parsearPrecio(cols.precio !== undefined ? row.getCell(cols.precio).value : '');
+                    if (!nombre && isNaN(precio))
+                        return;
+                    if (!nombre || isNaN(precio)) {
+                        errores.push(`Fila ${rowNumber}: Nombre y Precio son obligatorios`);
+                        return;
+                    }
+                    const precioOferta = this.parsearPrecio(cols.precioOferta !== undefined ? row.getCell(cols.precioOferta).value : '');
+                    const stockVal = parseInt(celda(cols.stock), 10);
+                    filas.push({
+                        rowNumber,
+                        datos: {
+                            nombre,
+                            marca: celda(cols.marca) || null,
+                            modelo: celda(cols.modelo) || null,
+                            categoria: celda(cols.categoria) || null,
+                            descripcion: celda(cols.descripcion) || null,
+                            precio,
+                            precioOferta: isNaN(precioOferta) ? null : precioOferta,
+                            moneda: celda(cols.moneda) || 'PEN',
+                            stock: isNaN(stockVal) ? null : stockVal,
+                            activo: (celda(cols.activo) || 'sí').toLowerCase() !== 'no',
+                            detalles: {},
+                        },
+                    });
+                }
             }
             catch (err) {
                 errores.push(`Fila ${rowNumber}: ${err.message}`);
             }
         });
-        if (productosACrear.length > 0) {
+        for (const { rowNumber, datos } of filas) {
             try {
-                await this.repo.insert(productosACrear);
-                creados = productosACrear.length;
+                const existente = await this.repo.findOne({
+                    where: { clienteId, nombre: datos.nombre, estado: constants_1.Status.ACTIVE },
+                });
+                if (existente) {
+                    Object.assign(existente, {
+                        ...datos,
+                        detalles: { ...(existente.detalles || {}), ...datos.detalles },
+                        transaccion: constants_1.Transacccion.ACTUALIZAR,
+                        usuarioModificacion: usuarioCreacion,
+                    });
+                    await this.repo.save(existente);
+                    actualizados++;
+                }
+                else {
+                    await this.repo.save(this.repo.create({
+                        ...datos,
+                        clienteId,
+                        imagenes: [],
+                        estado: constants_1.Status.ACTIVE,
+                        transaccion: constants_1.Transacccion.CREAR,
+                        usuarioCreacion,
+                    }));
+                    creados++;
+                }
             }
             catch (err) {
-                errores.push(`Error al insertar productos: ${err.message}`);
+                errores.push(`Fila ${rowNumber}: ${err.message}`);
             }
         }
-        return { creados, errores };
+        this.logger.log(`Import Excel: ${creados} creados, ${actualizados} actualizados, ${errores.length} errores`);
+        return { creados, actualizados, errores };
     }
 };
 ProductoService = ProductoService_1 = __decorate([

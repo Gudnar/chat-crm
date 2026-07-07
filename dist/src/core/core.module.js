@@ -24,6 +24,8 @@ const remarketing_module_1 = require("./remarketing/remarketing.module");
 const base_conocimiento_module_1 = require("./base-conocimiento/base-conocimiento.module");
 const producto_module_1 = require("./producto/producto.module");
 const soporte_module_1 = require("./soporte/soporte.module");
+const agente_humano_module_1 = require("./agente-humano/agente-humano.module");
+const oportunidad_module_1 = require("./oportunidad/oportunidad.module");
 let CoreModule = class CoreModule {
 };
 CoreModule = __decorate([
@@ -59,6 +61,8 @@ CoreModule = __decorate([
             base_conocimiento_module_1.BaseConocimientoModule,
             producto_module_1.ProductoModule,
             soporte_module_1.SoporteModule,
+            agente_humano_module_1.AgenteHumanoModule,
+            oportunidad_module_1.OportunidadModule,
         ],
     })
 ], CoreModule);

@@ -41,8 +41,10 @@ let ProductoController = class ProductoController {
     constructor(productoService) {
         this.productoService = productoService;
     }
-    async listar(q, categoria, req) {
-        const datos = await this.productoService.listar(req.user.clienteId, q, categoria);
+    async listar(q, categoria, pagina, limite, req) {
+        const paginaNum = Math.max(1, parseInt(pagina, 10) || 1);
+        const limiteNum = Math.min(100, Math.max(1, parseInt(limite, 10) || 25));
+        const datos = await this.productoService.listar(req.user.clienteId, q, categoria, paginaNum, limiteNum);
         return new success_response_dto_1.SuccessResponseDto(datos);
     }
     async obtener(id, req) {
@@ -84,16 +86,18 @@ let ProductoController = class ProductoController {
             return new success_response_dto_1.SuccessResponseDto(null, 'Archivo requerido');
         }
         const resultado = await this.productoService.importarExcel(file.buffer, req.user.clienteId, req.user.id);
-        return new success_response_dto_1.SuccessResponseDto(resultado, `Se importaron ${resultado.creados} productos`);
+        return new success_response_dto_1.SuccessResponseDto(resultado, `Importación completada: ${resultado.creados} creados, ${resultado.actualizados} actualizados`);
     }
 };
 __decorate([
     (0, common_1.Get)(),
     __param(0, (0, common_1.Query)('q')),
     __param(1, (0, common_1.Query)('categoria')),
-    __param(2, (0, common_1.Request)()),
+    __param(2, (0, common_1.Query)('pagina')),
+    __param(3, (0, common_1.Query)('limite')),
+    __param(4, (0, common_1.Request)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, Object]),
+    __metadata("design:paramtypes", [String, String, String, String, Object]),
     __metadata("design:returntype", Promise)
 ], ProductoController.prototype, "listar", null);
 __decorate([

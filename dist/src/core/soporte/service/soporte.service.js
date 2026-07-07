@@ -18,19 +18,57 @@ const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const caso_entity_1 = require("../entity/caso.entity");
+const conversacion_entity_1 = require("../../conversacion/entity/conversacion.entity");
 const base_service_1 = require("../../../common/base/base-service");
 const constants_1 = require("../../../common/constants");
 let SoporteService = SoporteService_1 = class SoporteService extends base_service_1.BaseService {
-    constructor(casoRepository) {
+    constructor(casoRepository, conversacionRepo) {
         super(SoporteService_1.name);
         this.casoRepository = casoRepository;
+        this.conversacionRepo = conversacionRepo;
+    }
+    async generarNumeroCaso(clienteId) {
+        const ultimo = await this.casoRepository.createQueryBuilder('c')
+            .select('MAX(c.id)', 'max')
+            .where('c.clienteId = :clienteId', { clienteId })
+            .getRawOne();
+        const siguiente = (parseInt(ultimo?.max, 10) || 0) + 1;
+        return `CASO-${String(siguiente).padStart(4, '0')}-${clienteId}`;
+    }
+    async sincronizarDesdeConversacion(casos) {
+        const conConversacion = casos.filter(c => c.conversacionId);
+        if (!conConversacion.length)
+            return;
+        const ids = [...new Set(conConversacion.map(c => String(c.conversacionId)))];
+        const convs = await this.conversacionRepo.find({ where: { id: (0, typeorm_2.In)(ids) } });
+        const porId = new Map(convs.map(c => [String(c.id), c]));
+        for (const caso of conConversacion) {
+            const conv = porId.get(String(caso.conversacionId));
+            if (!conv)
+                continue;
+            const updates = {};
+            const nombreAsignado = conv.notas && conv.notas.startsWith('Nombre:')
+                ? conv.notas.replace('Nombre:', '').trim()
+                : null;
+            if (nombreAsignado && caso.nombreContacto !== nombreAsignado) {
+                updates.nombreContacto = nombreAsignado;
+            }
+            if (!caso.telefonoContacto)
+                updates.telefonoContacto = conv.contacto;
+            if (Object.keys(updates).length) {
+                Object.assign(caso, updates);
+                await this.casoRepository.update(caso.id, updates);
+            }
+        }
     }
     async listar(clienteId) {
-        return this.casoRepository.find({
+        const casos = await this.casoRepository.find({
             where: { clienteId, estado: constants_1.Status.ACTIVE },
             order: { fechaCreacion: 'DESC' },
             take: 100,
         });
+        await this.sincronizarDesdeConversacion(casos);
+        return casos;
     }
     async obtener(id, clienteId) {
         const caso = await this.casoRepository.findOne({
@@ -38,15 +76,36 @@ let SoporteService = SoporteService_1 = class SoporteService extends base_servic
         });
         if (!caso)
             throw new common_1.NotFoundException('Caso no encontrado');
+        await this.sincronizarDesdeConversacion([caso]);
         return caso;
     }
-    async crear(titulo, descripcion, nombreContacto, prioridad, categoria, clienteId, usuarioCreacion, conversacionId) {
-        const numeroCaso = `CASO-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    async crear(titulo, descripcion, nombreContacto, prioridad, categoria, clienteId, usuarioCreacion, conversacionId, telefonoContacto, emailContacto) {
+        if (conversacionId) {
+            const conv = await this.conversacionRepo.findOne({
+                where: { id: conversacionId, clienteId, estado: constants_1.Status.ACTIVE },
+            });
+            if (conv) {
+                const nombreAsignado = conv.notas && conv.notas.startsWith('Nombre:')
+                    ? conv.notas.replace('Nombre:', '').trim()
+                    : null;
+                nombreContacto = nombreContacto || nombreAsignado || conv.contacto;
+                telefonoContacto = telefonoContacto || conv.contacto;
+                const ultimoDelCliente = [...(conv.mensajes || [])].reverse().find(m => m.role === 'user');
+                titulo = titulo || `Atención a ${nombreContacto} (${conv.canal})`;
+                descripcion = descripcion || (ultimoDelCliente
+                    ? `Último mensaje del cliente: "${ultimoDelCliente.content}"`
+                    : `Caso creado desde la conversación de ${conv.canal}`);
+                categoria = categoria || conv.canal;
+            }
+        }
+        const numeroCaso = await this.generarNumeroCaso(clienteId);
         const caso = this.casoRepository.create({
             numeroCaso,
             titulo,
             descripcion,
             nombreContacto,
+            telefonoContacto: telefonoContacto || undefined,
+            emailContacto: emailContacto || undefined,
             prioridad,
             categoria,
             conversacionId,
@@ -59,7 +118,9 @@ let SoporteService = SoporteService_1 = class SoporteService extends base_servic
                     timestamp: new Date().toISOString(),
                     accion: 'Caso creado',
                     usuario: usuarioCreacion,
-                    detalles: `Caso ${numeroCaso} creado`,
+                    detalles: conversacionId
+                        ? `Caso ${numeroCaso} creado desde la conversación #${conversacionId}`
+                        : `Caso ${numeroCaso} creado`,
                 }],
         });
         return this.casoRepository.save(caso);
@@ -133,7 +194,9 @@ let SoporteService = SoporteService_1 = class SoporteService extends base_servic
 SoporteService = SoporteService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(caso_entity_1.CasoSoporte)),
-    __metadata("design:paramtypes", [typeorm_2.Repository])
+    __param(1, (0, typeorm_1.InjectRepository)(conversacion_entity_1.Conversacion)),
+    __metadata("design:paramtypes", [typeorm_2.Repository,
+        typeorm_2.Repository])
 ], SoporteService);
 exports.SoporteService = SoporteService;
 //# sourceMappingURL=soporte.service.js.map

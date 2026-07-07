@@ -5,5 +5,5 @@ export declare class AuthenticationController {
     constructor(authService: AuthenticationService);
     login(req: any): Promise<SuccessResponseDto>;
     perfil(req: any): Promise<SuccessResponseDto>;
-    logout(): Promise<SuccessResponseDto>;
+    logout(req: any): Promise<SuccessResponseDto>;
 }

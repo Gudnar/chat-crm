@@ -1,8 +1,9 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { UsuarioService } from '../../usuario/service/usuario.service'
+import { AgenteHumanoService } from '../../agente-humano/service/agente-humano.service'
 import { TextService } from '../../../common/lib/text.service'
-import { Status, Configurations } from '../../../common/constants'
+import { Status, Configurations, Roles } from '../../../common/constants'
 import { Messages } from '../../../common/constants/response-messages'
 import { BaseService } from '../../../common/base/base-service'
 import dayjs from 'dayjs'
@@ -12,6 +13,7 @@ export class AuthenticationService extends BaseService {
   constructor(
     private readonly usuarioService: UsuarioService,
     private readonly jwtService: JwtService,
+    private readonly agenteHumanoService: AgenteHumanoService,
   ) {
     super(AuthenticationService.name)
   }
@@ -60,8 +62,20 @@ export class AuthenticationService extends BaseService {
     const payload = { id: user.id, roles: user.roles, clienteId: user.clienteId ?? null }
     const access_token = this.jwtService.sign(payload)
     this.logger.log(`Usuario autenticado: ${user.id}`)
+
+    // Si es un agente humano, registrar su sesión y ponerlo disponible
+    if (user.roles.includes(Roles.AGENTE_HUMANO)) {
+      await this.agenteHumanoService.registrarSesion(user.id)
+    }
+
     return {
       data: { access_token, ...userData },
+    }
+  }
+
+  async cerrarSesion(usuarioId: string, roles: string[]): Promise<void> {
+    if (roles.includes(Roles.AGENTE_HUMANO)) {
+      await this.agenteHumanoService.cerrarSesion(usuarioId)
     }
   }
 }

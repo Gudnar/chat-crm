@@ -43,8 +43,10 @@ export class SoporteController {
       req.user.clienteId,
       req.user.id,
       body.conversacionId,
+      body.telefonoContacto,
+      body.emailContacto,
     )
-    return new SuccessResponseDto(datos, 'Caso de soporte creado')
+    return new SuccessResponseDto(datos, `Caso ${datos.numeroCaso} creado`)
   }
 
   @Patch(':id/estado')

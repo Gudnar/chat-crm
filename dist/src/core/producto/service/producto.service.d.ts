@@ -10,7 +10,15 @@ export declare class ProductoService extends BaseService {
     constructor(repo: Repository<Producto>, configService: ConfigService);
     construirUrlImagen(filename: string): string;
     resolverUrlsImagenes(filenames: string[]): string[];
-    listar(clienteId: string, q?: string, categoria?: string): Promise<Producto[]>;
+    listar(clienteId: string, q?: string, categoria?: string, pagina?: number, limite?: number, soloActivos?: boolean): Promise<{
+        items: Producto[];
+        total: number;
+        activos: number;
+        pagina: number;
+        totalPaginas: number;
+        limite: number;
+        categorias: string[];
+    }>;
     obtener(id: string, clienteId: string): Promise<Producto>;
     crear(dto: CreateProductoDto, clienteId: string, usuarioCreacion: string): Promise<Producto>;
     actualizar(id: string, dto: UpdateProductoDto, clienteId: string, usuarioModificacion: string): Promise<Producto>;
@@ -21,8 +29,12 @@ export declare class ProductoService extends BaseService {
     buscar(clienteId: string, termino: string, categoria?: string): Promise<Producto[]>;
     formatearParaClaude(productos: Producto[]): string;
     exportarExcel(clienteId: string): Promise<Buffer>;
+    private valorCelda;
+    private parsearPrecio;
+    private normalizarHeader;
     importarExcel(buffer: Buffer, clienteId: string, usuarioCreacion: string): Promise<{
         creados: number;
+        actualizados: number;
         errores: string[];
     }>;
 }

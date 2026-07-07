@@ -23,6 +23,27 @@ export declare const Roles: {
     SUPER_ADMIN: string;
     ADMIN_CLIENTE: string;
     COLABORADOR: string;
+    AGENTE_HUMANO: string;
+};
+export declare const TipoAgente: {
+    IA: string;
+    HUMANO: string;
+};
+export declare const DisponibilidadAgente: {
+    INACTIVO: string;
+    DISPONIBLE: string;
+    OCUPADO: string;
+    AUSENTE: string;
+};
+export declare const TipoActividadAgente: {
+    LOGIN: string;
+    LOGOUT: string;
+    CAMBIO_ESTADO: string;
+    ASIGNACION: string;
+    REASIGNACION: string;
+    ESCALADA: string;
+    CIERRE: string;
+    NOTA: string;
 };
 export declare const ModoAgente: {
     FULL: string;
@@ -35,4 +56,24 @@ export declare const EstadoConversacion: {
     PENDIENTE: string;
     RESUELTO: string;
     CERRADO: string;
+};
+export declare const EstadoOportunidad: {
+    PROSPECTO: string;
+    NECESITA_COTIZACION: string;
+    COTIZACION_ENVIADA: string;
+    REUNION_PENDIENTE: string;
+    REUNION_REALIZADA: string;
+    NEGOCIACION: string;
+    GANADA: string;
+    PERDIDA: string;
+    CANCELADA: string;
+};
+export declare const ESTADOS_OPORTUNIDAD_FINALES: string[];
+export declare const OrigenOportunidad: {
+    WHATSAPP: string;
+    FACEBOOK: string;
+    INSTAGRAM: string;
+    REFERENCIA: string;
+    WEB: string;
+    OTRO: string;
 };

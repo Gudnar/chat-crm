@@ -1,10 +1,12 @@
 import { JwtService } from '@nestjs/jwt';
 import { UsuarioService } from '../../usuario/service/usuario.service';
+import { AgenteHumanoService } from '../../agente-humano/service/agente-humano.service';
 import { BaseService } from '../../../common/base/base-service';
 export declare class AuthenticationService extends BaseService {
     private readonly usuarioService;
     private readonly jwtService;
-    constructor(usuarioService: UsuarioService, jwtService: JwtService);
+    private readonly agenteHumanoService;
+    constructor(usuarioService: UsuarioService, jwtService: JwtService, agenteHumanoService: AgenteHumanoService);
     validarUsuario(usuario: string, contrasenaBase64: string): Promise<{
         id: string;
         roles: string[];
@@ -46,4 +48,5 @@ export declare class AuthenticationService extends BaseService {
             access_token: string;
         };
     }>;
+    cerrarSesion(usuarioId: string, roles: string[]): Promise<void>;
 }

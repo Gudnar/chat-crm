@@ -31,7 +31,8 @@ let AuthenticationController = class AuthenticationController {
     async perfil(req) {
         return new success_response_dto_1.SuccessResponseDto(req.user);
     }
-    async logout() {
+    async logout(req) {
+        await this.authService.cerrarSesion(req.user.id, req.user.roles ?? []);
         return new success_response_dto_1.SuccessResponseDto(null, 'Sesión cerrada correctamente');
     }
 };
@@ -55,8 +56,9 @@ __decorate([
 __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Post)('logout'),
+    __param(0, (0, common_1.Request)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", []),
+    __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", Promise)
 ], AuthenticationController.prototype, "logout", null);
 AuthenticationController = __decorate([

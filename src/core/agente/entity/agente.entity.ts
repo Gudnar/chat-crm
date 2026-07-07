@@ -1,5 +1,6 @@
-import { Column, Entity, PrimaryGeneratedColumn, OneToMany, ManyToOne, JoinColumn } from 'typeorm'
+import { Column, Entity, PrimaryGeneratedColumn, OneToMany, ManyToOne, JoinColumn, Index } from 'typeorm'
 import { Cliente } from '../../cliente/entity/cliente.entity'
+import { Usuario } from '../../usuario/entity/usuario.entity'
 import { AuditoriaEntity } from '../../../common/entity/auditoria.entity'
 
 @Entity({ name: 'agente', schema: process.env.DB_SCHEMA || 'public' })
@@ -9,6 +10,38 @@ export class Agente extends AuditoriaEntity {
 
   @Column({ name: 'nombre', length: 100 })
   nombre: string
+
+  // ── Tipo de agente: 'ia' (Claude) o 'humano' (operador con credenciales) ──
+  @Index()
+  @Column({ name: 'tipo_agente', length: 20, default: 'ia' })
+  tipoAgente: string
+
+  // Solo agentes humanos: vínculo al usuario con credenciales de acceso
+  @Index()
+  @Column({ name: 'usuario_id', type: 'bigint', nullable: true })
+  usuarioId: string | null
+
+  @ManyToOne(() => Usuario, { nullable: true })
+  @JoinColumn({ name: 'usuario_id' })
+  usuarioAcceso?: Usuario | null
+
+  // Solo agentes humanos: disponibilidad operativa
+  @Index()
+  @Column({ name: 'estado_disponibilidad', length: 20, default: 'inactivo' })
+  estadoDisponibilidad: string
+
+  @Column({ name: 'sesion_activa', type: 'boolean', default: false })
+  sesionActiva: boolean
+
+  @Column({ name: 'ultimo_acceso', type: 'timestamptz', nullable: true })
+  ultimoAcceso?: Date | null
+
+  // Horario laboral: { "lunes": { "inicio": "09:00", "fin": "18:00" }, ... }
+  @Column({ name: 'horas_trabajo', type: 'jsonb', default: '{}' })
+  horasTrabajo: Record<string, { inicio: string; fin: string }>
+
+  @Column({ name: 'especialidades', type: 'jsonb', default: '[]' })
+  especialidades: string[]
 
   @Column({ name: 'descripcion', length: 500, nullable: true })
   descripcion?: string

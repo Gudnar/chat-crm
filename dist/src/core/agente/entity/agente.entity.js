@@ -12,6 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Agente = void 0;
 const typeorm_1 = require("typeorm");
 const cliente_entity_1 = require("../../cliente/entity/cliente.entity");
+const usuario_entity_1 = require("../../usuario/entity/usuario.entity");
 const auditoria_entity_1 = require("../../../common/entity/auditoria.entity");
 let Agente = class Agente extends auditoria_entity_1.AuditoriaEntity {
     constructor(data) {
@@ -28,6 +29,42 @@ __decorate([
     (0, typeorm_1.Column)({ name: 'nombre', length: 100 }),
     __metadata("design:type", String)
 ], Agente.prototype, "nombre", void 0);
+__decorate([
+    (0, typeorm_1.Index)(),
+    (0, typeorm_1.Column)({ name: 'tipo_agente', length: 20, default: 'ia' }),
+    __metadata("design:type", String)
+], Agente.prototype, "tipoAgente", void 0);
+__decorate([
+    (0, typeorm_1.Index)(),
+    (0, typeorm_1.Column)({ name: 'usuario_id', type: 'bigint', nullable: true }),
+    __metadata("design:type", Object)
+], Agente.prototype, "usuarioId", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => usuario_entity_1.Usuario, { nullable: true }),
+    (0, typeorm_1.JoinColumn)({ name: 'usuario_id' }),
+    __metadata("design:type", Object)
+], Agente.prototype, "usuarioAcceso", void 0);
+__decorate([
+    (0, typeorm_1.Index)(),
+    (0, typeorm_1.Column)({ name: 'estado_disponibilidad', length: 20, default: 'inactivo' }),
+    __metadata("design:type", String)
+], Agente.prototype, "estadoDisponibilidad", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'sesion_activa', type: 'boolean', default: false }),
+    __metadata("design:type", Boolean)
+], Agente.prototype, "sesionActiva", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'ultimo_acceso', type: 'timestamptz', nullable: true }),
+    __metadata("design:type", Object)
+], Agente.prototype, "ultimoAcceso", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'horas_trabajo', type: 'jsonb', default: '{}' }),
+    __metadata("design:type", Object)
+], Agente.prototype, "horasTrabajo", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'especialidades', type: 'jsonb', default: '[]' }),
+    __metadata("design:type", Array)
+], Agente.prototype, "especialidades", void 0);
 __decorate([
     (0, typeorm_1.Column)({ name: 'descripcion', length: 500, nullable: true }),
     __metadata("design:type", String)

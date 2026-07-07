@@ -7,6 +7,7 @@ import { AuthenticationService } from './service/authentication.service'
 import { JwtStrategy } from './strategies/jwt.strategy'
 import { LocalStrategy } from './strategies/local.strategy'
 import { UsuarioModule } from '../usuario/usuario.module'
+import { AgenteHumanoModule } from '../agente-humano/agente-humano.module'
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { UsuarioModule } from '../usuario/usuario.module'
     }),
     ConfigModule,
     UsuarioModule,
+    AgenteHumanoModule,
   ],
   providers: [AuthenticationService, LocalStrategy, JwtStrategy],
   exports: [AuthenticationService],

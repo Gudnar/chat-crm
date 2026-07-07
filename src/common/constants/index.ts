@@ -28,6 +28,30 @@ export const Roles = {
   SUPER_ADMIN: 'SUPER_ADMIN',
   ADMIN_CLIENTE: 'ADMIN_CLIENTE',
   COLABORADOR: 'COLABORADOR',
+  AGENTE_HUMANO: 'AGENTE_HUMANO',
+}
+
+export const TipoAgente = {
+  IA: 'ia',
+  HUMANO: 'humano',
+}
+
+export const DisponibilidadAgente = {
+  INACTIVO: 'inactivo',
+  DISPONIBLE: 'disponible',
+  OCUPADO: 'ocupado',
+  AUSENTE: 'ausente',
+}
+
+export const TipoActividadAgente = {
+  LOGIN: 'login',
+  LOGOUT: 'logout',
+  CAMBIO_ESTADO: 'cambio_estado',
+  ASIGNACION: 'asignacion',
+  REASIGNACION: 'reasignacion',
+  ESCALADA: 'escalada',
+  CIERRE: 'cierre',
+  NOTA: 'nota',
 }
 
 export const ModoAgente = {
@@ -42,4 +66,31 @@ export const EstadoConversacion = {
   PENDIENTE: 'pendiente',
   RESUELTO: 'resuelto',
   CERRADO: 'cerrado',
+}
+
+export const EstadoOportunidad = {
+  PROSPECTO: 'prospecto',
+  NECESITA_COTIZACION: 'necesita-cotizacion',
+  COTIZACION_ENVIADA: 'cotizacion-enviada',
+  REUNION_PENDIENTE: 'reunion-pendiente',
+  REUNION_REALIZADA: 'reunion-realizada',
+  NEGOCIACION: 'negociacion',
+  GANADA: 'ganada',
+  PERDIDA: 'perdida',
+  CANCELADA: 'cancelada',
+}
+
+export const ESTADOS_OPORTUNIDAD_FINALES = [
+  EstadoOportunidad.GANADA,
+  EstadoOportunidad.PERDIDA,
+  EstadoOportunidad.CANCELADA,
+]
+
+export const OrigenOportunidad = {
+  WHATSAPP: 'whatsapp',
+  FACEBOOK: 'facebook',
+  INSTAGRAM: 'instagram',
+  REFERENCIA: 'referencia',
+  WEB: 'web',
+  OTRO: 'otro',
 }

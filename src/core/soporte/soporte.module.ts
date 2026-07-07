@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { CasoSoporte } from './entity/caso.entity'
+import { Conversacion } from '../conversacion/entity/conversacion.entity'
 import { SoporteService } from './service/soporte.service'
 import { SoporteController } from './controller/soporte.controller'
 
 @Module({
-  imports: [TypeOrmModule.forFeature([CasoSoporte])],
+  imports: [TypeOrmModule.forFeature([CasoSoporte, Conversacion])],
   controllers: [SoporteController],
   providers: [SoporteService],
   exports: [SoporteService],

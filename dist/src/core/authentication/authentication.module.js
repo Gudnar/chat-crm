@@ -16,6 +16,7 @@ const authentication_service_1 = require("./service/authentication.service");
 const jwt_strategy_1 = require("./strategies/jwt.strategy");
 const local_strategy_1 = require("./strategies/local.strategy");
 const usuario_module_1 = require("../usuario/usuario.module");
+const agente_humano_module_1 = require("../agente-humano/agente-humano.module");
 let AuthenticationModule = class AuthenticationModule {
 };
 AuthenticationModule = __decorate([
@@ -32,6 +33,7 @@ AuthenticationModule = __decorate([
             }),
             config_1.ConfigModule,
             usuario_module_1.UsuarioModule,
+            agente_humano_module_1.AgenteHumanoModule,
         ],
         providers: [authentication_service_1.AuthenticationService, local_strategy_1.LocalStrategy, jwt_strategy_1.JwtStrategy],
         exports: [authentication_service_1.AuthenticationService],

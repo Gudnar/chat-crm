@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { In, Repository } from 'typeorm'
 import { CasoSoporte } from '../entity/caso.entity'
+import { Conversacion } from '../../conversacion/entity/conversacion.entity'
 import { BaseService } from '../../../common/base/base-service'
 import { Status, Transacccion } from '../../../common/constants'
 import { Messages } from '../../../common/constants/response-messages'
@@ -10,17 +11,63 @@ import { Messages } from '../../../common/constants/response-messages'
 export class SoporteService extends BaseService {
   constructor(
     @InjectRepository(CasoSoporte)
-    private readonly casoRepository: Repository<CasoSoporte>
+    private readonly casoRepository: Repository<CasoSoporte>,
+    @InjectRepository(Conversacion)
+    private readonly conversacionRepo: Repository<Conversacion>,
   ) {
     super(SoporteService.name)
   }
 
+  /** Correlativo por cliente, mismo formato que Oportunidades (CASO-0001-2) */
+  private async generarNumeroCaso(clienteId: string): Promise<string> {
+    const ultimo = await this.casoRepository.createQueryBuilder('c')
+      .select('MAX(c.id)', 'max')
+      .where('c.clienteId = :clienteId', { clienteId })
+      .getRawOne()
+    const siguiente = (parseInt(ultimo?.max, 10) || 0) + 1
+    return `CASO-${String(siguiente).padStart(4, '0')}-${clienteId}`
+  }
+
+  /**
+   * Sincroniza el nombre configurado del contacto (notas "Nombre: X" en la Bandeja)
+   * y el teléfono desde la conversación vinculada — igual que en Oportunidades.
+   */
+  private async sincronizarDesdeConversacion(casos: CasoSoporte[]): Promise<void> {
+    const conConversacion = casos.filter(c => c.conversacionId)
+    if (!conConversacion.length) return
+
+    const ids = [...new Set(conConversacion.map(c => String(c.conversacionId)))]
+    const convs = await this.conversacionRepo.find({ where: { id: In(ids) } })
+    const porId = new Map(convs.map(c => [String(c.id), c]))
+
+    for (const caso of conConversacion) {
+      const conv = porId.get(String(caso.conversacionId))
+      if (!conv) continue
+
+      const updates: Partial<CasoSoporte> = {}
+      const nombreAsignado = conv.notas && conv.notas.startsWith('Nombre:')
+        ? conv.notas.replace('Nombre:', '').trim()
+        : null
+      if (nombreAsignado && caso.nombreContacto !== nombreAsignado) {
+        updates.nombreContacto = nombreAsignado
+      }
+      if (!caso.telefonoContacto) updates.telefonoContacto = conv.contacto
+
+      if (Object.keys(updates).length) {
+        Object.assign(caso, updates)
+        await this.casoRepository.update(caso.id, updates)
+      }
+    }
+  }
+
   async listar(clienteId: string): Promise<CasoSoporte[]> {
-    return this.casoRepository.find({
+    const casos = await this.casoRepository.find({
       where: { clienteId, estado: Status.ACTIVE },
       order: { fechaCreacion: 'DESC' },
       take: 100,
     })
+    await this.sincronizarDesdeConversacion(casos)
+    return casos
   }
 
   async obtener(id: string, clienteId: string): Promise<CasoSoporte> {
@@ -28,6 +75,7 @@ export class SoporteService extends BaseService {
       where: { id, clienteId, estado: Status.ACTIVE }
     })
     if (!caso) throw new NotFoundException('Caso no encontrado')
+    await this.sincronizarDesdeConversacion([caso])
     return caso
   }
 
@@ -39,15 +87,39 @@ export class SoporteService extends BaseService {
     categoria: string,
     clienteId: string,
     usuarioCreacion: string,
-    conversacionId?: string
+    conversacionId?: string,
+    telefonoContacto?: string,
+    emailContacto?: string,
   ): Promise<CasoSoporte> {
-    const numeroCaso = `CASO-${Date.now()}-${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+    // Si viene de una conversación (botón en la Bandeja), completar datos como en Oportunidades
+    if (conversacionId) {
+      const conv = await this.conversacionRepo.findOne({
+        where: { id: conversacionId, clienteId, estado: Status.ACTIVE },
+      })
+      if (conv) {
+        const nombreAsignado = conv.notas && conv.notas.startsWith('Nombre:')
+          ? conv.notas.replace('Nombre:', '').trim()
+          : null
+        nombreContacto = nombreContacto || nombreAsignado || conv.contacto
+        telefonoContacto = telefonoContacto || conv.contacto
+        const ultimoDelCliente = [...(conv.mensajes || [])].reverse().find(m => m.role === 'user')
+        titulo = titulo || `Atención a ${nombreContacto} (${conv.canal})`
+        descripcion = descripcion || (ultimoDelCliente
+          ? `Último mensaje del cliente: "${ultimoDelCliente.content}"`
+          : `Caso creado desde la conversación de ${conv.canal}`)
+        categoria = categoria || conv.canal
+      }
+    }
+
+    const numeroCaso = await this.generarNumeroCaso(clienteId)
 
     const caso = this.casoRepository.create({
       numeroCaso,
       titulo,
       descripcion,
       nombreContacto,
+      telefonoContacto: telefonoContacto || undefined,
+      emailContacto: emailContacto || undefined,
       prioridad,
       categoria,
       conversacionId,
@@ -60,7 +132,9 @@ export class SoporteService extends BaseService {
         timestamp: new Date().toISOString(),
         accion: 'Caso creado',
         usuario: usuarioCreacion,
-        detalles: `Caso ${numeroCaso} creado`,
+        detalles: conversacionId
+          ? `Caso ${numeroCaso} creado desde la conversación #${conversacionId}`
+          : `Caso ${numeroCaso} creado`,
       }],
     })
     return this.casoRepository.save(caso)

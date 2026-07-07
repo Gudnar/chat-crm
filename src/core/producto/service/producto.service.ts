@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { ILike, Repository } from 'typeorm'
+import { Repository } from 'typeorm'
 import { existsSync, unlinkSync } from 'fs'
 import { join } from 'path'
 import { ConfigService } from '@nestjs/config'
@@ -33,22 +33,50 @@ export class ProductoService extends BaseService {
 
   // ── CRUD ──────────────────────────────────────────────────────
 
-  async listar(clienteId: string, q?: string, categoria?: string): Promise<Producto[]> {
-    const base = { clienteId, estado: Status.ACTIVE, activo: true }
-    const where: any[] = q
-      ? [
-          { ...base, nombre: ILike(`%${q}%`) },
-          { ...base, marca: ILike(`%${q}%`) },
-          { ...base, modelo: ILike(`%${q}%`) },
-          { ...base, descripcion: ILike(`%${q}%`) },
-          { ...base, categoria: ILike(`%${q}%`) },
-        ]
-      : [base]
+  async listar(
+    clienteId: string,
+    q?: string,
+    categoria?: string,
+    pagina = 1,
+    limite = 25,
+    soloActivos = false,
+  ): Promise<{ items: Producto[]; total: number; activos: number; pagina: number; totalPaginas: number; limite: number; categorias: string[] }> {
+    const qb = this.repo.createQueryBuilder('p')
+      .where('p.clienteId = :clienteId', { clienteId })
+      .andWhere('p.estado = :estado', { estado: Status.ACTIVE })
 
-    const items = await this.repo.find({ where, order: { nombre: 'ASC' }, take: 50 })
-    return categoria
-      ? items.filter(p => p.categoria?.toLowerCase() === categoria.toLowerCase())
-      : items
+    if (soloActivos) qb.andWhere('p.activo = true')
+    if (q) {
+      qb.andWhere(
+        '(p.nombre ILIKE :q OR p.marca ILIKE :q OR p.modelo ILIKE :q OR p.descripcion ILIKE :q OR p.categoria ILIKE :q)',
+        { q: `%${q}%` },
+      )
+    }
+    if (categoria) qb.andWhere('LOWER(p.categoria) = LOWER(:categoria)', { categoria })
+
+    const total = await qb.getCount()
+    const totalPaginas = Math.max(1, Math.ceil(total / limite))
+    const paginaSegura = Math.min(Math.max(1, pagina), totalPaginas)
+
+    const items = await qb.clone()
+      .orderBy('p.nombre', 'ASC')
+      .skip((paginaSegura - 1) * limite)
+      .take(limite)
+      .getMany()
+
+    const activos = await qb.clone().andWhere('p.activo = true').getCount()
+
+    // Categorías de todo el catálogo del cliente (para el filtro del frontend)
+    const catRows = await this.repo.createQueryBuilder('p')
+      .select('DISTINCT p.categoria', 'categoria')
+      .where('p.clienteId = :clienteId AND p.estado = :estado AND p.categoria IS NOT NULL', {
+        clienteId, estado: Status.ACTIVE,
+      })
+      .orderBy('categoria', 'ASC')
+      .getRawMany()
+    const categorias = catRows.map(r => r.categoria).filter(Boolean)
+
+    return { items, total, activos, pagina: paginaSegura, totalPaginas, limite, categorias }
   }
 
   async obtener(id: string, clienteId: string): Promise<Producto> {
@@ -122,7 +150,8 @@ export class ProductoService extends BaseService {
   // ── Búsqueda para herramienta Claude ─────────────────────────
 
   async buscar(clienteId: string, termino: string, categoria?: string): Promise<Producto[]> {
-    return this.listar(clienteId, termino, categoria)
+    const { items } = await this.listar(clienteId, termino, categoria, 1, 10, true)
+    return items
   }
 
   formatearParaClaude(productos: Producto[]): string {
@@ -195,69 +224,269 @@ export class ProductoService extends BaseService {
     return await workbook.xlsx.writeBuffer() as Buffer
   }
 
-  async importarExcel(buffer: Buffer, clienteId: string, usuarioCreacion: string): Promise<{ creados: number; errores: string[] }> {
+  // ── Helpers de parseo de Excel ────────────────────────────────
+
+  /** Extrae el valor plano de una celda (soporta hipervínculos, richText, fórmulas y fechas). */
+  private valorCelda(celda: ExcelJS.Cell): string {
+    const v: any = celda?.value
+    if (v == null) return ''
+    if (typeof v === 'object') {
+      if (v.richText) return v.richText.map((r: any) => r.text).join('').trim()
+      if (v.text != null) return String(v.text).trim() // hipervínculo
+      if (v.result != null) return String(v.result).trim() // fórmula
+      if (v instanceof Date) return v.toISOString()
+      return String(v).trim()
+    }
+    return String(v).trim()
+  }
+
+  /** Parsea precios como "$21.613", "Bs 216.130", "21,613.50" o números nativos. */
+  private parsearPrecio(valor: any): number {
+    if (valor == null || valor === '') return NaN
+    if (typeof valor === 'number') return valor
+    // Desenvolver celdas con hipervínculo, richText o fórmula
+    if (typeof valor === 'object') {
+      if (typeof valor.result === 'number') return valor.result
+      const texto = valor.text ?? valor.result ?? (valor.richText ? valor.richText.map((r: any) => r.text).join('') : '')
+      return this.parsearPrecio(String(texto))
+    }
+    let s = String(valor).replace(/[^\d.,-]/g, '').trim()
+    if (!s) return NaN
+    if (/^\d{1,3}(\.\d{3})+(,\d+)?$/.test(s)) {
+      // Formato latino: punto de miles, coma decimal → 21.613 = 21613
+      s = s.replace(/\./g, '').replace(',', '.')
+    } else if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) {
+      // Formato anglosajón: coma de miles → 21,613.50
+      s = s.replace(/,/g, '')
+    } else {
+      s = s.replace(',', '.')
+    }
+    return parseFloat(s)
+  }
+
+  /** Normaliza encabezados: minúsculas, sin acentos ni espacios extras. */
+  private normalizarHeader(texto: string): string {
+    return texto
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
+  async importarExcel(buffer: Buffer, clienteId: string, usuarioCreacion: string): Promise<{ creados: number; actualizados: number; errores: string[] }> {
     const workbook = new ExcelJS.Workbook()
     await workbook.xlsx.load(buffer)
     const worksheet = workbook.getWorksheet(1)
 
     let creados = 0
+    let actualizados = 0
     const errores: string[] = []
-    const productosACrear: any[] = []
 
-    worksheet?.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return // Skip header
+    if (!worksheet) {
+      return { creados, actualizados, errores: ['El archivo no contiene hojas de cálculo.'] }
+    }
 
-      try {
-        const values = row.values as any[]
-        const nombre = values[1]
-        const marca = values[2]
-        const modelo = values[3]
-        const categoria = values[4]
-        const descripcion = values[5]
-        const precio = parseFloat(values[6])
-        const precioOferta = values[7] ? parseFloat(values[7]) : null
-        const moneda = values[8] || 'PEN'
-        const stock = values[9] ? parseInt(values[9], 10) : null
-        const activo = (values[10] || 'Sí').toLowerCase() === 'sí'
-
-        if (!nombre || isNaN(precio)) {
-          errores.push(`Fila ${rowNumber}: Nombre y Precio son obligatorios`)
-          return
+    // 1. Detectar la fila de encabezados (puede haber un título antes, como en las listas de precios)
+    let filaHeaders = 0
+    const mapa: Record<string, number> = {} // header normalizado → índice de columna
+    const headerOriginal: Record<number, string> = {} // índice de columna → texto original del encabezado
+    for (let r = 1; r <= Math.min(worksheet.rowCount, 10); r++) {
+      const row = worksheet.getRow(r)
+      const headers: Record<string, number> = {}
+      const originales: Record<number, string> = {}
+      row.eachCell((cell, col) => {
+        const original = this.valorCelda(cell)
+        const h = this.normalizarHeader(original)
+        if (h) {
+          headers[h] = col
+          originales[col] = original
         }
+      })
+      const keys = Object.keys(headers)
+      const esFilaHeader =
+        (keys.includes('marca') && keys.includes('modelo')) ||
+        (keys.includes('nombre') && keys.includes('precio'))
+      if (esFilaHeader) {
+        filaHeaders = r
+        Object.assign(mapa, headers)
+        Object.assign(headerOriginal, originales)
+        break
+      }
+    }
 
-        productosACrear.push({
-          nombre,
-          marca: marca || null,
-          modelo: modelo || null,
-          categoria: categoria || null,
-          descripcion: descripcion || null,
-          precio,
-          precioOferta: precioOferta || null,
-          moneda,
-          stock: stock || null,
-          activo,
-          clienteId,
-          imagenes: [],
-          detalles: {},
-          estado: Status.ACTIVE,
-          transaccion: Transacccion.CREAR,
-          usuarioCreacion,
-        } as any)
+    if (!filaHeaders) {
+      return {
+        creados,
+        actualizados,
+        errores: ['No se encontró la fila de encabezados. El archivo debe incluir las columnas "Marca" y "Modelo" (o "Nombre" y "Precio").'],
+      }
+    }
+
+    // 2. Localizador de columnas por sinónimos
+    const col = (...nombres: string[]): number | undefined => {
+      for (const n of nombres) {
+        if (mapa[n] !== undefined) return mapa[n]
+        // Coincidencia parcial (ej. "en mano" dentro de "precio en mano")
+        const parcial = Object.keys(mapa).find(k => k.includes(n))
+        if (parcial) return mapa[parcial]
+      }
+      return undefined
+    }
+
+    const cols = {
+      nombre: col('nombre'),
+      categoria: col('categoria', 'catego'),
+      marca: col('marca'),
+      modelo: col('modelo'),
+      version: col('version'),
+      descripcion: col('descripcion'),
+      potencia: col('potencia'),
+      asientos: col('asientos', 'asien'),
+      transmision: col('transmision'),
+      traccion: col('traccion', 'tracc'),
+      carroceria: col('carroceria', 'carro'),
+      autonomia: col('autonomia'),
+      bateria: col('bateria'),
+      pantalla: col('pantalla'),
+      precioUsd: col('en mano', 'precio usd', 'precio $'),
+      precioBs: col('precio bs', 'bs'),
+      precio: col('precio'),
+      precioOferta: col('precio oferta', 'oferta'),
+      moneda: col('moneda'),
+      stock: col('stock'),
+      activo: col('activo'),
+    }
+
+    const esFormatoVehiculos = cols.marca !== undefined && cols.modelo !== undefined && cols.nombre === undefined
+
+    // 3. Procesar filas de datos
+    const filas: Array<{ rowNumber: number; datos: any }> = []
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber <= filaHeaders) return
+      try {
+        const celda = (c?: number) => (c !== undefined ? this.valorCelda(row.getCell(c)) : '')
+
+        if (esFormatoVehiculos) {
+          // ── Formato lista de precios (vehículos) ──
+          const marca = celda(cols.marca)
+          const modelo = celda(cols.modelo)
+          if (!marca && !modelo) return // fila vacía o decorativa
+
+          const version = celda(cols.version)
+          const precioUsd = this.parsearPrecio(
+            cols.precioUsd !== undefined ? row.getCell(cols.precioUsd).value : celda(cols.precio),
+          )
+          if (!marca || !modelo || isNaN(precioUsd)) {
+            errores.push(`Fila ${rowNumber}: Marca, Modelo y precio "en Mano" son obligatorios`)
+            return
+          }
+
+          const precioBs = cols.precioBs !== undefined
+            ? this.parsearPrecio(row.getCell(cols.precioBs).value)
+            : NaN
+
+          // Specs técnicas (columnas F–M): encabezado + contenido → descripcion
+          const specs: Array<keyof typeof cols> = [
+            'potencia', 'asientos', 'transmision', 'traccion',
+            'carroceria', 'autonomia', 'bateria', 'pantalla',
+          ]
+          const partesDescripcion: string[] = []
+          for (const c of specs) {
+            const colIdx = cols[c]
+            const val = celda(colIdx)
+            if (val && colIdx !== undefined) {
+              const etiqueta = headerOriginal[colIdx] || String(c)
+              partesDescripcion.push(`${etiqueta}: ${val}`)
+            }
+          }
+          const descripcion = partesDescripcion.length ? partesDescripcion.join(', ') : null
+
+          const detalles: Record<string, any> = {}
+          if (version) detalles.version = version
+          if (!isNaN(precioBs)) detalles.precioBs = precioBs
+
+          filas.push({
+            rowNumber,
+            datos: {
+              nombre: [marca, modelo, version].filter(Boolean).join(' '),
+              marca,
+              modelo,
+              categoria: celda(cols.categoria) || null,
+              descripcion,
+              precio: precioUsd,
+              precioOferta: null,
+              moneda: 'USD',
+              stock: null,
+              activo: true,
+              detalles,
+            },
+          })
+        } else {
+          // ── Formato clásico (export propio): Nombre + Precio ──
+          const nombre = celda(cols.nombre)
+          const precio = this.parsearPrecio(cols.precio !== undefined ? row.getCell(cols.precio).value : '')
+          if (!nombre && isNaN(precio)) return // fila vacía
+          if (!nombre || isNaN(precio)) {
+            errores.push(`Fila ${rowNumber}: Nombre y Precio son obligatorios`)
+            return
+          }
+          const precioOferta = this.parsearPrecio(cols.precioOferta !== undefined ? row.getCell(cols.precioOferta).value : '')
+          const stockVal = parseInt(celda(cols.stock), 10)
+          filas.push({
+            rowNumber,
+            datos: {
+              nombre,
+              marca: celda(cols.marca) || null,
+              modelo: celda(cols.modelo) || null,
+              categoria: celda(cols.categoria) || null,
+              descripcion: celda(cols.descripcion) || null,
+              precio,
+              precioOferta: isNaN(precioOferta) ? null : precioOferta,
+              moneda: celda(cols.moneda) || 'PEN',
+              stock: isNaN(stockVal) ? null : stockVal,
+              activo: (celda(cols.activo) || 'sí').toLowerCase() !== 'no',
+              detalles: {},
+            },
+          })
+        }
       } catch (err: any) {
         errores.push(`Fila ${rowNumber}: ${err.message}`)
       }
     })
 
-    // Insertar todos los productos
-    if (productosACrear.length > 0) {
+    // 4. Upsert: actualizar si ya existe (mismo nombre = marca+modelo+versión), crear si no
+    for (const { rowNumber, datos } of filas) {
       try {
-        await this.repo.insert(productosACrear)
-        creados = productosACrear.length
+        const existente = await this.repo.findOne({
+          where: { clienteId, nombre: datos.nombre, estado: Status.ACTIVE },
+        })
+        if (existente) {
+          Object.assign(existente, {
+            ...datos,
+            detalles: { ...(existente.detalles || {}), ...datos.detalles },
+            transaccion: Transacccion.ACTUALIZAR,
+            usuarioModificacion: usuarioCreacion,
+          })
+          await this.repo.save(existente)
+          actualizados++
+        } else {
+          await this.repo.save(this.repo.create({
+            ...datos,
+            clienteId,
+            imagenes: [],
+            estado: Status.ACTIVE,
+            transaccion: Transacccion.CREAR,
+            usuarioCreacion,
+          }))
+          creados++
+        }
       } catch (err: any) {
-        errores.push(`Error al insertar productos: ${err.message}`)
+        errores.push(`Fila ${rowNumber}: ${err.message}`)
       }
     }
 
-    return { creados, errores }
+    this.logger.log(`Import Excel: ${creados} creados, ${actualizados} actualizados, ${errores.length} errores`)
+    return { creados, actualizados, errores }
   }
 }

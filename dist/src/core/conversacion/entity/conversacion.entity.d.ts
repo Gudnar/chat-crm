@@ -3,6 +3,9 @@ import { AuditoriaEntity } from '../../../common/entity/auditoria.entity';
 export declare class Conversacion extends AuditoriaEntity {
     id: string;
     agenteId: string | null;
+    agenteHumanoId: string | null;
+    tipoAgenteAsignado?: string | null;
+    fechaAsignacionHumano?: Date | null;
     contacto: string;
     canal: string;
     estadoConversacion: string;

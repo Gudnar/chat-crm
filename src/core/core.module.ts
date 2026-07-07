@@ -15,6 +15,8 @@ import { RemarketingModule } from './remarketing/remarketing.module'
 import { BaseConocimientoModule } from './base-conocimiento/base-conocimiento.module'
 import { ProductoModule } from './producto/producto.module'
 import { SoporteModule } from './soporte/soporte.module'
+import { AgenteHumanoModule } from './agente-humano/agente-humano.module'
+import { OportunidadModule } from './oportunidad/oportunidad.module'
 
 @Module({
   imports: [
@@ -48,6 +50,8 @@ import { SoporteModule } from './soporte/soporte.module'
     BaseConocimientoModule,
     ProductoModule,
     SoporteModule,
+    AgenteHumanoModule,
+    OportunidadModule,
   ],
 })
 export class CoreModule {}

@@ -39,9 +39,13 @@ export class ProductoController {
   async listar(
     @Query('q') q: string,
     @Query('categoria') categoria: string,
+    @Query('pagina') pagina: string,
+    @Query('limite') limite: string,
     @Request() req: any,
   ): Promise<SuccessResponseDto> {
-    const datos = await this.productoService.listar(req.user.clienteId, q, categoria)
+    const paginaNum = Math.max(1, parseInt(pagina, 10) || 1)
+    const limiteNum = Math.min(100, Math.max(1, parseInt(limite, 10) || 25))
+    const datos = await this.productoService.listar(req.user.clienteId, q, categoria, paginaNum, limiteNum)
     return new SuccessResponseDto(datos)
   }
 
@@ -125,6 +129,9 @@ export class ProductoController {
       return new SuccessResponseDto(null, 'Archivo requerido')
     }
     const resultado = await this.productoService.importarExcel(file.buffer, req.user.clienteId, req.user.id)
-    return new SuccessResponseDto(resultado, `Se importaron ${resultado.creados} productos`)
+    return new SuccessResponseDto(
+      resultado,
+      `Importación completada: ${resultado.creados} creados, ${resultado.actualizados} actualizados`,
+    )
   }
 }

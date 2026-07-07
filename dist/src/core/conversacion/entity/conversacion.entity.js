@@ -29,6 +29,19 @@ __decorate([
     __metadata("design:type", Object)
 ], Conversacion.prototype, "agenteId", void 0);
 __decorate([
+    (0, typeorm_1.Index)(),
+    (0, typeorm_1.Column)({ name: 'agente_humano_id', type: 'bigint', nullable: true }),
+    __metadata("design:type", Object)
+], Conversacion.prototype, "agenteHumanoId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'tipo_agente_asignado', type: 'varchar', length: 20, nullable: true }),
+    __metadata("design:type", Object)
+], Conversacion.prototype, "tipoAgenteAsignado", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'fecha_asignacion_humano', type: 'timestamptz', nullable: true }),
+    __metadata("design:type", Object)
+], Conversacion.prototype, "fechaAsignacionHumano", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: 'contacto', length: 200 }),
     __metadata("design:type", String)
 ], Conversacion.prototype, "contacto", void 0);

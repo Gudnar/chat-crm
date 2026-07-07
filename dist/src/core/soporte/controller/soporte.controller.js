@@ -35,8 +35,8 @@ let SoporteController = class SoporteController {
         return new success_response_dto_1.SuccessResponseDto(datos);
     }
     async crear(body, req) {
-        const datos = await this.soporteService.crear(body.titulo, body.descripcion, body.nombreContacto, body.prioridad || 'media', body.categoria, req.user.clienteId, req.user.id, body.conversacionId);
-        return new success_response_dto_1.SuccessResponseDto(datos, 'Caso de soporte creado');
+        const datos = await this.soporteService.crear(body.titulo, body.descripcion, body.nombreContacto, body.prioridad || 'media', body.categoria, req.user.clienteId, req.user.id, body.conversacionId, body.telefonoContacto, body.emailContacto);
+        return new success_response_dto_1.SuccessResponseDto(datos, `Caso ${datos.numeroCaso} creado`);
     }
     async cambiarEstado(id, estadoCaso, req) {
         const datos = await this.soporteService.cambiarEstado(id, req.user.clienteId, estadoCaso, req.user.id);

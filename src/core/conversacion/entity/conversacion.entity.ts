@@ -1,4 +1,4 @@
-import { Column, Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn } from 'typeorm'
+import { Column, Entity, PrimaryGeneratedColumn, ManyToOne, JoinColumn, Index } from 'typeorm'
 import { Cliente } from '../../cliente/entity/cliente.entity'
 import { AuditoriaEntity } from '../../../common/entity/auditoria.entity'
 
@@ -9,6 +9,18 @@ export class Conversacion extends AuditoriaEntity {
 
   @Column({ name: 'agente_id', type: 'bigint', nullable: true })
   agenteId: string | null
+
+  // Agente humano asignado al seguimiento (null si la atiende solo la IA)
+  @Index()
+  @Column({ name: 'agente_humano_id', type: 'bigint', nullable: true })
+  agenteHumanoId: string | null
+
+  // 'ia' | 'humano' — quién tiene la conversación actualmente
+  @Column({ name: 'tipo_agente_asignado', type: 'varchar', length: 20, nullable: true })
+  tipoAgenteAsignado?: string | null
+
+  @Column({ name: 'fecha_asignacion_humano', type: 'timestamptz', nullable: true })
+  fechaAsignacionHumano?: Date | null
 
   @Column({ name: 'contacto', length: 200 })
   contacto: string

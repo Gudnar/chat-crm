@@ -6,7 +6,7 @@ import { SuccessResponseDto } from '../../../common/dto/success-response.dto';
 export declare class ProductoController {
     private readonly productoService;
     constructor(productoService: ProductoService);
-    listar(q: string, categoria: string, req: any): Promise<SuccessResponseDto>;
+    listar(q: string, categoria: string, pagina: string, limite: string, req: any): Promise<SuccessResponseDto>;
     obtener(id: string, req: any): Promise<SuccessResponseDto>;
     crear(dto: CreateProductoDto, req: any): Promise<SuccessResponseDto>;
     actualizar(id: string, dto: UpdateProductoDto, req: any): Promise<SuccessResponseDto>;

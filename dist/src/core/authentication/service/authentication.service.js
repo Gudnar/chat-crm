@@ -17,16 +17,18 @@ exports.AuthenticationService = void 0;
 const common_1 = require("@nestjs/common");
 const jwt_1 = require("@nestjs/jwt");
 const usuario_service_1 = require("../../usuario/service/usuario.service");
+const agente_humano_service_1 = require("../../agente-humano/service/agente-humano.service");
 const text_service_1 = require("../../../common/lib/text.service");
 const constants_1 = require("../../../common/constants");
 const response_messages_1 = require("../../../common/constants/response-messages");
 const base_service_1 = require("../../../common/base/base-service");
 const dayjs_1 = __importDefault(require("dayjs"));
 let AuthenticationService = AuthenticationService_1 = class AuthenticationService extends base_service_1.BaseService {
-    constructor(usuarioService, jwtService) {
+    constructor(usuarioService, jwtService, agenteHumanoService) {
         super(AuthenticationService_1.name);
         this.usuarioService = usuarioService;
         this.jwtService = jwtService;
+        this.agenteHumanoService = agenteHumanoService;
     }
     async validarUsuario(usuario, contrasenaBase64) {
         const respuesta = await this.usuarioService.buscarUsuario(usuario);
@@ -65,15 +67,24 @@ let AuthenticationService = AuthenticationService_1 = class AuthenticationServic
         const payload = { id: user.id, roles: user.roles, clienteId: user.clienteId ?? null };
         const access_token = this.jwtService.sign(payload);
         this.logger.log(`Usuario autenticado: ${user.id}`);
+        if (user.roles.includes(constants_1.Roles.AGENTE_HUMANO)) {
+            await this.agenteHumanoService.registrarSesion(user.id);
+        }
         return {
             data: { access_token, ...userData },
         };
+    }
+    async cerrarSesion(usuarioId, roles) {
+        if (roles.includes(constants_1.Roles.AGENTE_HUMANO)) {
+            await this.agenteHumanoService.cerrarSesion(usuarioId);
+        }
     }
 };
 AuthenticationService = AuthenticationService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [usuario_service_1.UsuarioService,
-        jwt_1.JwtService])
+        jwt_1.JwtService,
+        agente_humano_service_1.AgenteHumanoService])
 ], AuthenticationService);
 exports.AuthenticationService = AuthenticationService;
 //# sourceMappingURL=authentication.service.js.map
