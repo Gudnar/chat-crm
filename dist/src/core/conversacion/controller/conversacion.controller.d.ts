@@ -17,4 +17,7 @@ export declare class ConversacionController {
     calificarConIA(id: string, req: any): Promise<SuccessResponseDto>;
     actualizarScore(id: string, score: number): Promise<SuccessResponseDto>;
     actualizarEstado(id: string, estadoConversacion: string): Promise<SuccessResponseDto>;
+    actualizarNotas(id: string, notas: string): Promise<SuccessResponseDto>;
+    actualizarAgente(id: string, agenteId: string | null): Promise<SuccessResponseDto>;
+    actualizar(id: string, body: any, req: any): Promise<SuccessResponseDto>;
 }

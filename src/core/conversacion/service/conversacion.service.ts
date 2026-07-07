@@ -33,6 +33,12 @@ export class ConversacionService extends BaseService {
     return conv
   }
 
+  async obtenerPorClienteId(id: string, clienteId: string): Promise<Conversacion> {
+    const conv = await this.conversacionRepository.findOne({ where: { id, clienteId, estado: Status.ACTIVE } })
+    if (!conv) throw new NotFoundException(Messages.CONVERSACION_NOT_FOUND)
+    return conv
+  }
+
   async crear(dto: CreateConversacionDto, usuarioCreacion: string, clienteId: string): Promise<Conversacion> {
     const conv = this.conversacionRepository.create({
       ...dto,
@@ -67,6 +73,50 @@ export class ConversacionService extends BaseService {
 
   async actualizarEstado(id: string, estadoConversacion: string): Promise<void> {
     await this.conversacionRepository.update(id, { estadoConversacion })
+  }
+
+  async escalar(id: string, razon?: string): Promise<void> {
+    const conv = await this.obtener(id)
+    conv.escalado = true
+    conv.estadoConversacion = 'pendiente'
+    if (razon) {
+      conv.notas = conv.notas ? `${conv.notas}\n[ESCALADO] ${razon}` : `[ESCALADO] ${razon}`
+    }
+    conv.transaccion = Transacccion.ACTUALIZAR
+    await this.conversacionRepository.save(conv)
+  }
+
+  async agregarNota(id: string, nota: string): Promise<void> {
+    const conv = await this.obtener(id)
+    const ts = new Date().toISOString()
+    conv.notas = conv.notas ? `${conv.notas}\n[${ts}] ${nota}` : `[${ts}] ${nota}`
+    conv.transaccion = Transacccion.ACTUALIZAR
+    await this.conversacionRepository.save(conv)
+  }
+
+  async actualizarNotas(id: string, notas: string): Promise<Conversacion> {
+    const conv = await this.obtener(id)
+    conv.notas = notas
+    conv.transaccion = Transacccion.ACTUALIZAR
+    return this.conversacionRepository.save(conv)
+  }
+
+  async actualizarAgente(id: string, agenteId: string | null): Promise<Conversacion> {
+    const conv = await this.obtener(id)
+    if (agenteId) {
+      conv.agenteId = String(parseInt(agenteId, 10))
+    } else {
+      conv.agenteId = null
+    }
+    conv.transaccion = Transacccion.ACTUALIZAR
+    return this.conversacionRepository.save(conv)
+  }
+
+  async actualizarEtiquetas(id: string, etiquetas: string[]): Promise<Conversacion> {
+    const conv = await this.obtener(id)
+    conv.etiquetas = Array.isArray(etiquetas) ? etiquetas : []
+    conv.transaccion = Transacccion.ACTUALIZAR
+    return this.conversacionRepository.save(conv)
   }
 
   async estadisticas(clienteId: string | null, agenteId?: string): Promise<any> {

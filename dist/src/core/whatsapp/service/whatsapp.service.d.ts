@@ -15,6 +15,7 @@ export declare class WhatsappService {
     guardarConfig(clienteId: string, data: Partial<WaConfig>, usuarioId: string): Promise<void>;
     private apiPost;
     enviarTexto(to: string, text: string, config: WaConfig): Promise<any>;
+    enviarImagen(to: string, imageUrl: string, caption: string, config: WaConfig): Promise<void>;
     marcarLeido(messageId: string, config: WaConfig): Promise<void>;
     mostrarTyping(messageId: string, config: WaConfig): Promise<void>;
     testConexion(accessToken: string, phoneNumberId: string): Promise<{

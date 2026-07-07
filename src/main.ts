@@ -7,6 +7,7 @@ import { NestExpressApplication } from '@nestjs/platform-express'
 import helmet from 'helmet'
 import cookieParser from 'cookie-parser'
 import dotenv from 'dotenv'
+import { join } from 'path'
 import {
   SWAGGER_API_CURRENT_VERSION,
   SWAGGER_API_DESCRIPTION,
@@ -31,6 +32,9 @@ const bootstrap = async () => {
 
   app.use(helmet.hidePoweredBy())
   app.use(cookieParser())
+
+  // Servir archivos subidos (imágenes de productos, etc.)
+  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' })
 
   // Rewrite /webhook → /whatsapp/webhook so Meta can use the shorter URL
   app.use((req: any, _res: any, next: any) => {

@@ -2,7 +2,7 @@ import { Cliente } from '../../cliente/entity/cliente.entity';
 import { AuditoriaEntity } from '../../../common/entity/auditoria.entity';
 export declare class Conversacion extends AuditoriaEntity {
     id: string;
-    agenteId: string;
+    agenteId: string | null;
     contacto: string;
     canal: string;
     estadoConversacion: string;

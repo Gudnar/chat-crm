@@ -21,6 +21,9 @@ const cliente_module_1 = require("./cliente/cliente.module");
 const mi_cuenta_module_1 = require("./mi-cuenta/mi-cuenta.module");
 const red_social_module_1 = require("./red-social/red-social.module");
 const remarketing_module_1 = require("./remarketing/remarketing.module");
+const base_conocimiento_module_1 = require("./base-conocimiento/base-conocimiento.module");
+const producto_module_1 = require("./producto/producto.module");
+const soporte_module_1 = require("./soporte/soporte.module");
 let CoreModule = class CoreModule {
 };
 CoreModule = __decorate([
@@ -53,6 +56,9 @@ CoreModule = __decorate([
             mi_cuenta_module_1.MiCuentaModule,
             red_social_module_1.RedSocialModule,
             remarketing_module_1.RemarketingModule,
+            base_conocimiento_module_1.BaseConocimientoModule,
+            producto_module_1.ProductoModule,
+            soporte_module_1.SoporteModule,
         ],
     })
 ], CoreModule);

@@ -90,6 +90,21 @@ export class WhatsappService {
     }
   }
 
+  async enviarImagen(to: string, imageUrl: string, caption: string, config: WaConfig): Promise<void> {
+    try {
+      await this.apiPost(config.phoneNumberId, config.accessToken, {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: to.replace(/\D/g, ''),
+        type: 'image',
+        image: { link: imageUrl, ...(caption ? { caption } : {}) },
+      })
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err.message
+      this.logger.warn(`[WA] No se pudo enviar imagen (${imageUrl}): ${msg}`)
+    }
+  }
+
   async marcarLeido(messageId: string, config: WaConfig): Promise<void> {
     try {
       await this.apiPost(config.phoneNumberId, config.accessToken, {

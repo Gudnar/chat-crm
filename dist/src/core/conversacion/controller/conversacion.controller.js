@@ -69,6 +69,35 @@ let ConversacionController = class ConversacionController {
         await this.conversacionService.actualizarEstado(id, estadoConversacion);
         return new success_response_dto_1.SuccessResponseDto(null, 'Estado actualizado');
     }
+    async actualizarNotas(id, notas) {
+        const datos = await this.conversacionService.actualizarNotas(id, notas);
+        return new success_response_dto_1.SuccessResponseDto(datos, 'Nota guardada');
+    }
+    async actualizarAgente(id, agenteId) {
+        const datos = await this.conversacionService.actualizarAgente(id, agenteId);
+        return new success_response_dto_1.SuccessResponseDto(datos, 'Agente asignado');
+    }
+    async actualizar(id, body, req) {
+        let datos = await this.conversacionService.obtenerPorClienteId(id, req.user.clienteId);
+        if ('notas' in body) {
+            datos = await this.conversacionService.actualizarNotas(id, body.notas);
+        }
+        if ('agenteId' in body) {
+            datos = await this.conversacionService.actualizarAgente(id, body.agenteId);
+        }
+        if ('etiquetas' in body) {
+            datos = await this.conversacionService.actualizarEtiquetas(id, body.etiquetas);
+        }
+        if ('estadoConversacion' in body) {
+            await this.conversacionService.actualizarEstado(id, body.estadoConversacion);
+            datos = await this.conversacionService.obtener(id);
+        }
+        if ('score' in body) {
+            await this.conversacionService.actualizarScore(id, body.score);
+            datos = await this.conversacionService.obtener(id);
+        }
+        return new success_response_dto_1.SuccessResponseDto(datos, 'Conversación actualizada');
+    }
 };
 __decorate([
     (0, common_1.Get)(),
@@ -155,6 +184,31 @@ __decorate([
     __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", Promise)
 ], ConversacionController.prototype, "actualizarEstado", null);
+__decorate([
+    (0, common_1.Patch)(':id/notas'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)('notas')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", Promise)
+], ConversacionController.prototype, "actualizarNotas", null);
+__decorate([
+    (0, common_1.Patch)(':id/agente'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)('agenteId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], ConversacionController.prototype, "actualizarAgente", null);
+__decorate([
+    (0, common_1.Patch)(':id'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object]),
+    __metadata("design:returntype", Promise)
+], ConversacionController.prototype, "actualizar", null);
 ConversacionController = __decorate([
     (0, swagger_1.ApiTags)('Conversaciones'),
     (0, swagger_1.ApiBearerAuth)('defaultBearerAuth'),

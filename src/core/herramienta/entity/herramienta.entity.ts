@@ -1,6 +1,16 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm'
 import { AuditoriaEntity } from '../../../common/entity/auditoria.entity'
 
+export interface ParametroHerramienta {
+  nombre: string
+  tipo: 'string' | 'number' | 'integer' | 'boolean' | 'enum'
+  descripcion: string
+  requerido: boolean
+  opciones?: string[]
+  minimo?: number
+  maximo?: number
+}
+
 @Entity({ name: 'herramienta', schema: process.env.DB_SCHEMA || 'public' })
 export class Herramienta extends AuditoriaEntity {
   @PrimaryGeneratedColumn({ name: 'id', type: 'bigint' })

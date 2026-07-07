@@ -90,4 +90,51 @@ export class ConversacionController {
     await this.conversacionService.actualizarEstado(id, estadoConversacion)
     return new SuccessResponseDto(null, 'Estado actualizado')
   }
+
+  @Patch(':id/notas')
+  async actualizarNotas(
+    @Param('id') id: string,
+    @Body('notas') notas: string,
+  ): Promise<SuccessResponseDto> {
+    const datos = await this.conversacionService.actualizarNotas(id, notas)
+    return new SuccessResponseDto(datos, 'Nota guardada')
+  }
+
+  @Patch(':id/agente')
+  async actualizarAgente(
+    @Param('id') id: string,
+    @Body('agenteId') agenteId: string | null,
+  ): Promise<SuccessResponseDto> {
+    const datos = await this.conversacionService.actualizarAgente(id, agenteId)
+    return new SuccessResponseDto(datos, 'Agente asignado')
+  }
+
+  @Patch(':id')
+  async actualizar(
+    @Param('id') id: string,
+    @Body() body: any,
+    @Request() req: any,
+  ): Promise<SuccessResponseDto> {
+    let datos: any = await this.conversacionService.obtenerPorClienteId(id, req.user.clienteId)
+
+    if ('notas' in body) {
+      datos = await this.conversacionService.actualizarNotas(id, body.notas)
+    }
+    if ('agenteId' in body) {
+      datos = await this.conversacionService.actualizarAgente(id, body.agenteId)
+    }
+    if ('etiquetas' in body) {
+      datos = await this.conversacionService.actualizarEtiquetas(id, body.etiquetas)
+    }
+    if ('estadoConversacion' in body) {
+      await this.conversacionService.actualizarEstado(id, body.estadoConversacion)
+      datos = await this.conversacionService.obtener(id)
+    }
+    if ('score' in body) {
+      await this.conversacionService.actualizarScore(id, body.score)
+      datos = await this.conversacionService.obtener(id)
+    }
+
+    return new SuccessResponseDto(datos, 'Conversación actualizada')
+  }
 }

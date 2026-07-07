@@ -20,15 +20,22 @@ const whatsapp_service_1 = require("./whatsapp.service");
 const conversacion_service_1 = require("../../conversacion/service/conversacion.service");
 const agente_service_1 = require("../../agente/service/agente.service");
 const configuracion_cliente_service_1 = require("../../cliente/service/configuracion-cliente.service");
+const herramienta_service_1 = require("../../herramienta/service/herramienta.service");
+const tool_executor_service_1 = require("../../herramienta/service/tool-executor.service");
+const base_conocimiento_service_1 = require("../../base-conocimiento/service/base-conocimiento.service");
 const constants_1 = require("../../../common/constants");
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 const MAX_HISTORY_MESSAGES = 20;
+const MAX_TOOL_ITERATIONS = 5;
 let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookService {
-    constructor(waService, conversacionService, agenteService, confClienteService) {
+    constructor(waService, conversacionService, agenteService, confClienteService, herramientaService, toolExecutor, baseConocimientoService) {
         this.waService = waService;
         this.conversacionService = conversacionService;
         this.agenteService = agenteService;
         this.confClienteService = confClienteService;
+        this.herramientaService = herramientaService;
+        this.toolExecutor = toolExecutor;
+        this.baseConocimientoService = baseConocimientoService;
         this.logger = new common_1.Logger(WhatsappWebhookService_1.name);
     }
     async procesarMensajeEntrante(rawMessage, contactName, phoneNumberId) {
@@ -67,13 +74,16 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
             const historial = (convActualizada.mensajes || [])
                 .slice(-MAX_HISTORY_MESSAGES)
                 .map(m => ({ role: m.role, content: m.content }));
-            const respuestaIA = await this.llamarClaude(agente, historial, clienteId);
-            if (!respuestaIA)
+            const { respuesta, imagenes } = await this.llamarClaude(agente, historial, clienteId, conversacion.id);
+            if (!respuesta)
                 return;
-            await this.conversacionService.agregarMensaje(conversacion.id, { role: 'assistant', content: respuestaIA });
+            await this.conversacionService.agregarMensaje(conversacion.id, { role: 'assistant', content: respuesta });
             await this.agenteService.incrementarContadores(agente.id, 1);
-            await this.waService.enviarTexto(from, respuestaIA, config);
-            this.logger.log(`[WA] Respuesta enviada a ${from}: "${respuestaIA.slice(0, 80)}"`);
+            await this.waService.enviarTexto(from, respuesta, config);
+            for (const imageUrl of imagenes) {
+                await this.waService.enviarImagen(from, imageUrl, '', config);
+            }
+            this.logger.log(`[WA] Respuesta enviada a ${from} (${imagenes.length} imágenes adjuntas)`);
         }
         catch (err) {
             this.logger.error(`[WA] Error procesando mensaje de ${from}: ${err.message}`);
@@ -109,33 +119,67 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
             notas: contactName !== from ? `Nombre: ${contactName}` : undefined,
         }, constants_1.USUARIO_SISTEMA, clienteId);
     }
-    async llamarClaude(agente, mensajes, clienteId) {
+    async llamarClaude(agente, mensajes, clienteId, conversacionId) {
         const apiKeyConfig = await this.confClienteService.obtenerPorClave(clienteId, 'ANTHROPIC_API_KEY');
         const apiKey = apiKeyConfig?.valor;
         if (!apiKey || apiKey.includes('•')) {
             this.logger.error('[WA] ANTHROPIC_API_KEY no configurada para este cliente');
-            return null;
+            return { respuesta: null, imagenes: [] };
         }
-        const systemPrompt = agente.systemPrompt ||
+        const instrucciones = agente.systemPrompt ||
             `Eres ${agente.nombre}, un asistente IA ${agente.tono || 'profesional'}. Responde en ${agente.idioma || 'español'} de forma concisa y útil.`;
+        const faqContexto = await this.baseConocimientoService.construirContexto(agente.id);
+        const systemPrompt = faqContexto ? `${instrucciones}\n\n${faqContexto}` : instrucciones;
+        const herramientas = await this.herramientaService.listarPorAgente(agente.id);
+        const tools = this.herramientaService.convertirAFormatoClaudeTools(herramientas);
+        const headers = {
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+        };
+        const messages = mensajes.map(m => ({ role: m.role, content: m.content }));
+        const pendingImages = [];
         try {
-            const res = await axios_1.default.post(ANTHROPIC_API, {
-                model: agente.modelo || 'claude-haiku-4-5',
-                max_tokens: agente.maxTokens || 256,
-                system: systemPrompt,
-                messages: mensajes,
-            }, {
-                headers: {
-                    'x-api-key': apiKey,
-                    'anthropic-version': '2023-06-01',
-                    'content-type': 'application/json',
-                },
-            });
-            return res.data?.content?.[0]?.text || null;
+            for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
+                const body = {
+                    model: agente.modelo || 'claude-haiku-4-5',
+                    max_tokens: agente.maxTokens || 256,
+                    system: systemPrompt,
+                    messages,
+                };
+                if (tools.length > 0)
+                    body.tools = tools;
+                const res = await axios_1.default.post(ANTHROPIC_API, body, { headers });
+                const { stop_reason, content } = res.data;
+                if (stop_reason === 'end_turn') {
+                    const textBlock = content.find((b) => b.type === 'text');
+                    return { respuesta: textBlock?.text ?? null, imagenes: pendingImages };
+                }
+                if (stop_reason === 'tool_use') {
+                    messages.push({ role: 'assistant', content });
+                    const toolResults = [];
+                    for (const block of content) {
+                        if (block.type !== 'tool_use')
+                            continue;
+                        this.logger.log(`[WA] Tool use: ${block.name} input=${JSON.stringify(block.input)}`);
+                        const resultado = await this.toolExecutor.ejecutar(block.name, block.input, { conversacionId, clienteId, agenteId: agente.id });
+                        if (resultado.imagenes?.length) {
+                            pendingImages.push(...resultado.imagenes);
+                        }
+                        toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultado.texto });
+                    }
+                    messages.push({ role: 'user', content: toolResults });
+                    continue;
+                }
+                const textBlock = content?.find((b) => b.type === 'text');
+                return { respuesta: textBlock?.text ?? null, imagenes: pendingImages };
+            }
+            this.logger.warn('[WA] Se alcanzó el límite de iteraciones de tool_use');
+            return { respuesta: null, imagenes: [] };
         }
         catch (err) {
             this.logger.error(`[WA] Error llamando a Claude: ${err?.response?.data?.error?.message || err.message}`);
-            return null;
+            return { respuesta: null, imagenes: [] };
         }
     }
 };
@@ -144,7 +188,10 @@ WhatsappWebhookService = WhatsappWebhookService_1 = __decorate([
     __metadata("design:paramtypes", [whatsapp_service_1.WhatsappService,
         conversacion_service_1.ConversacionService,
         agente_service_1.AgenteService,
-        configuracion_cliente_service_1.ConfiguracionClienteService])
+        configuracion_cliente_service_1.ConfiguracionClienteService,
+        herramienta_service_1.HerramientaService,
+        tool_executor_service_1.ToolExecutorService,
+        base_conocimiento_service_1.BaseConocimientoService])
 ], WhatsappWebhookService);
 exports.WhatsappWebhookService = WhatsappWebhookService;
 //# sourceMappingURL=whatsapp-webhook.service.js.map

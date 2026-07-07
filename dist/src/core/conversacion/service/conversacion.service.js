@@ -44,6 +44,12 @@ let ConversacionService = ConversacionService_1 = class ConversacionService exte
             throw new common_1.NotFoundException(response_messages_1.Messages.CONVERSACION_NOT_FOUND);
         return conv;
     }
+    async obtenerPorClienteId(id, clienteId) {
+        const conv = await this.conversacionRepository.findOne({ where: { id, clienteId, estado: constants_1.Status.ACTIVE } });
+        if (!conv)
+            throw new common_1.NotFoundException(response_messages_1.Messages.CONVERSACION_NOT_FOUND);
+        return conv;
+    }
     async crear(dto, usuarioCreacion, clienteId) {
         const conv = this.conversacionRepository.create({
             ...dto,
@@ -75,6 +81,46 @@ let ConversacionService = ConversacionService_1 = class ConversacionService exte
     }
     async actualizarEstado(id, estadoConversacion) {
         await this.conversacionRepository.update(id, { estadoConversacion });
+    }
+    async escalar(id, razon) {
+        const conv = await this.obtener(id);
+        conv.escalado = true;
+        conv.estadoConversacion = 'pendiente';
+        if (razon) {
+            conv.notas = conv.notas ? `${conv.notas}\n[ESCALADO] ${razon}` : `[ESCALADO] ${razon}`;
+        }
+        conv.transaccion = constants_1.Transacccion.ACTUALIZAR;
+        await this.conversacionRepository.save(conv);
+    }
+    async agregarNota(id, nota) {
+        const conv = await this.obtener(id);
+        const ts = new Date().toISOString();
+        conv.notas = conv.notas ? `${conv.notas}\n[${ts}] ${nota}` : `[${ts}] ${nota}`;
+        conv.transaccion = constants_1.Transacccion.ACTUALIZAR;
+        await this.conversacionRepository.save(conv);
+    }
+    async actualizarNotas(id, notas) {
+        const conv = await this.obtener(id);
+        conv.notas = notas;
+        conv.transaccion = constants_1.Transacccion.ACTUALIZAR;
+        return this.conversacionRepository.save(conv);
+    }
+    async actualizarAgente(id, agenteId) {
+        const conv = await this.obtener(id);
+        if (agenteId) {
+            conv.agenteId = String(parseInt(agenteId, 10));
+        }
+        else {
+            conv.agenteId = null;
+        }
+        conv.transaccion = constants_1.Transacccion.ACTUALIZAR;
+        return this.conversacionRepository.save(conv);
+    }
+    async actualizarEtiquetas(id, etiquetas) {
+        const conv = await this.obtener(id);
+        conv.etiquetas = Array.isArray(etiquetas) ? etiquetas : [];
+        conv.transaccion = constants_1.Transacccion.ACTUALIZAR;
+        return this.conversacionRepository.save(conv);
     }
     async estadisticas(clienteId, agenteId) {
         const where = { estado: constants_1.Status.ACTIVE };

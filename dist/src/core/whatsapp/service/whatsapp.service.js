@@ -87,6 +87,21 @@ let WhatsappService = WhatsappService_1 = class WhatsappService {
             throw new Error(metaError?.message || err.message || 'Error enviando mensaje WhatsApp');
         }
     }
+    async enviarImagen(to, imageUrl, caption, config) {
+        try {
+            await this.apiPost(config.phoneNumberId, config.accessToken, {
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: to.replace(/\D/g, ''),
+                type: 'image',
+                image: { link: imageUrl, ...(caption ? { caption } : {}) },
+            });
+        }
+        catch (err) {
+            const msg = err?.response?.data?.error?.message || err.message;
+            this.logger.warn(`[WA] No se pudo enviar imagen (${imageUrl}): ${msg}`);
+        }
+    }
     async marcarLeido(messageId, config) {
         try {
             await this.apiPost(config.phoneNumberId, config.accessToken, {

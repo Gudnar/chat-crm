@@ -25,8 +25,8 @@ __decorate([
     __metadata("design:type", String)
 ], Conversacion.prototype, "id", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'agente_id', type: 'bigint' }),
-    __metadata("design:type", String)
+    (0, typeorm_1.Column)({ name: 'agente_id', type: 'bigint', nullable: true }),
+    __metadata("design:type", Object)
 ], Conversacion.prototype, "agenteId", void 0);
 __decorate([
     (0, typeorm_1.Column)({ name: 'contacto', length: 200 }),

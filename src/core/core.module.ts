@@ -12,6 +12,9 @@ import { ClienteModule } from './cliente/cliente.module'
 import { MiCuentaModule } from './mi-cuenta/mi-cuenta.module'
 import { RedSocialModule } from './red-social/red-social.module'
 import { RemarketingModule } from './remarketing/remarketing.module'
+import { BaseConocimientoModule } from './base-conocimiento/base-conocimiento.module'
+import { ProductoModule } from './producto/producto.module'
+import { SoporteModule } from './soporte/soporte.module'
 
 @Module({
   imports: [
@@ -42,6 +45,9 @@ import { RemarketingModule } from './remarketing/remarketing.module'
     MiCuentaModule,
     RedSocialModule,
     RemarketingModule,
+    BaseConocimientoModule,
+    ProductoModule,
+    SoporteModule,
   ],
 })
 export class CoreModule {}

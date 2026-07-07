@@ -7,8 +7,8 @@ export class Conversacion extends AuditoriaEntity {
   @PrimaryGeneratedColumn({ name: 'id', type: 'bigint' })
   id: string
 
-  @Column({ name: 'agente_id', type: 'bigint' })
-  agenteId: string
+  @Column({ name: 'agente_id', type: 'bigint', nullable: true })
+  agenteId: string | null
 
   @Column({ name: 'contacto', length: 200 })
   contacto: string

@@ -11,6 +11,7 @@ const common_1 = require("@nestjs/common");
 const helmet_1 = __importDefault(require("helmet"));
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const dotenv_1 = __importDefault(require("dotenv"));
+const path_1 = require("path");
 const constants_1 = require("./common/constants");
 dotenv_1.default.config();
 const bootstrap = async () => {
@@ -25,6 +26,7 @@ const bootstrap = async () => {
     });
     app.use(helmet_1.default.hidePoweredBy());
     app.use((0, cookie_parser_1.default)());
+    app.useStaticAssets((0, path_1.join)(process.cwd(), 'uploads'), { prefix: '/uploads' });
     app.use((req, _res, next) => {
         if (req.url === '/webhook' || req.url.startsWith('/webhook?')) {
             req.url = req.url.replace('/webhook', '/whatsapp/webhook');
