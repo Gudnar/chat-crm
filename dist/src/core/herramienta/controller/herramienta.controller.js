@@ -36,6 +36,16 @@ let HerramientaController = class HerramientaController {
         const datos = await this.herramientaService.crear(dto, req.user.id);
         return new success_response_dto_1.SuccessResponseDto(datos, response_messages_1.Messages.SUCCESS_CREATE);
     }
+    async crearDefaults(agenteId, req) {
+        await this.agenteService.obtener(agenteId, req.user.clienteId);
+        const existentes = await this.herramientaService.listarPorAgente(agenteId);
+        if (existentes.length > 0) {
+            return new success_response_dto_1.SuccessResponseDto(existentes, 'El agente ya tiene herramientas configuradas');
+        }
+        await this.herramientaService.crearHerramientasPorDefecto(agenteId, req.user.id);
+        const datos = await this.herramientaService.listarPorAgente(agenteId);
+        return new success_response_dto_1.SuccessResponseDto(datos, `${datos.length} herramientas creadas para el agente`);
+    }
     async actualizar(id, dto, req) {
         const h = await this.herramientaService.obtener(id);
         await this.agenteService.obtener(h.agenteId, req.user.clienteId);
@@ -65,6 +75,14 @@ __decorate([
     __metadata("design:paramtypes", [create_herramienta_dto_1.CreateHerramientaDto, Object]),
     __metadata("design:returntype", Promise)
 ], HerramientaController.prototype, "crear", null);
+__decorate([
+    (0, common_1.Post)('defaults/:agenteId'),
+    __param(0, (0, common_1.Param)('agenteId')),
+    __param(1, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], HerramientaController.prototype, "crearDefaults", null);
 __decorate([
     (0, common_1.Put)(':id'),
     __param(0, (0, common_1.Param)('id')),

@@ -58,10 +58,15 @@ let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
     }
     async buscarProducto(input, ctx) {
         const productos = await this.productoService.buscar(ctx.clienteId, input.termino, input.categoria);
-        const texto = this.productoService.formatearParaClaude(productos);
+        let texto = this.productoService.formatearParaClaude(productos);
         const imagenes = productos
             .flatMap(p => this.productoService.resolverUrlsImagenes(p.imagenes || []))
             .slice(0, 3);
+        if (productos.length > 0) {
+            texto += imagenes.length
+                ? `\n\n[Sistema: se adjuntaron ${imagenes.length} imagen(es) del producto al chat del cliente]`
+                : '\n\n[Sistema: estos productos NO tienen imágenes cargadas — no se envió ninguna foto al cliente]';
+        }
         return { texto, imagenes };
     }
 };

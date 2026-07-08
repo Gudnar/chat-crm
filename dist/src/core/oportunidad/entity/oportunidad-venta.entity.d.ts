@@ -7,6 +7,9 @@ export interface HistorialOportunidad {
     usuarioId: string;
     usuarioNombre: string;
     detalles: string;
+    editado?: boolean;
+    editadoPor?: string;
+    editadoEn?: string;
 }
 export declare class OportunidadVenta extends AuditoriaEntity {
     id: string;

@@ -29,23 +29,23 @@ let AgenteHumanoController = class AgenteHumanoController {
         this.asignacionService = asignacionService;
     }
     async listar(req) {
-        const datos = await this.agenteHumanoService.listar(req.user.clienteId);
+        const datos = await this.agenteHumanoService.listar(this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos);
     }
     async crear(dto, req) {
-        const datos = await this.agenteHumanoService.crear(dto, req.user.id, req.user.clienteId);
+        const datos = await this.agenteHumanoService.crear(dto, req.user.id, this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos, 'Agente humano creado. Ya puede iniciar sesión con sus credenciales.');
     }
     async disponibles(req) {
-        const datos = await this.agenteHumanoService.obtenerDisponibles(req.user.clienteId);
+        const datos = await this.agenteHumanoService.obtenerDisponibles(this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos);
     }
     async estadisticasEquipo(req) {
-        const datos = await this.agenteHumanoService.estadisticasEquipo(req.user.clienteId);
+        const datos = await this.agenteHumanoService.estadisticasEquipo(this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos);
     }
     async cola(req) {
-        const datos = await this.asignacionService.colaSinAsignar(req.user.clienteId);
+        const datos = await this.asignacionService.colaSinAsignar(this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos);
     }
     async asignar(dto, req) {
@@ -53,61 +53,70 @@ let AgenteHumanoController = class AgenteHumanoController {
             const propio = await this.agentePropio(req);
             dto.agenteHumanoId = propio.id;
         }
-        const datos = await this.asignacionService.asignar(dto, req.user.id, req.user.clienteId);
+        const datos = await this.asignacionService.asignar(dto, req.user.id, this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos, 'Conversación asignada correctamente.');
     }
     async asignacionAutomatica(req) {
-        const datos = await this.asignacionService.asignacionAutomatica(req.user.id, req.user.clienteId);
+        const datos = await this.asignacionService.asignacionAutomatica(req.user.id, this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos, `${datos.asignadas} conversación(es) asignada(s).`);
     }
     async cerrarConversacion(id, dto, req) {
         const actor = await this.resolverActor(req);
-        const datos = await this.asignacionService.cerrar(id, dto, actor, req.user.clienteId);
+        const datos = await this.asignacionService.cerrar(id, dto, actor, this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos, 'Conversación marcada como resuelta.');
     }
     async devolverAIa(id, req) {
         const actor = await this.resolverActor(req);
-        const datos = await this.asignacionService.devolverAIa(id, actor, req.user.clienteId);
+        const datos = await this.asignacionService.devolverAIa(id, actor, this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos, 'Conversación devuelta al agente IA.');
     }
     async miPerfil(req) {
         const propio = await this.agentePropio(req);
-        const datos = await this.agenteHumanoService.estadisticas(propio.id, req.user.clienteId);
+        const datos = await this.agenteHumanoService.estadisticas(propio.id, this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos);
     }
     async miDisponibilidad(dto, req) {
         const propio = await this.agentePropio(req);
-        const datos = await this.agenteHumanoService.cambiarDisponibilidad(propio.id, dto.estado, req.user.clienteId);
+        const datos = await this.agenteHumanoService.cambiarDisponibilidad(propio.id, dto.estado, this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos, `Ahora estás ${dto.estado}.`);
     }
     async misConversaciones(req) {
         const propio = await this.agentePropio(req);
-        const datos = await this.asignacionService.misConversaciones(propio.id, req.user.clienteId);
+        const datos = await this.asignacionService.misConversaciones(propio.id, this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos);
     }
     async obtener(id, req) {
-        const datos = await this.agenteHumanoService.obtener(id, req.user.clienteId);
+        const datos = await this.agenteHumanoService.obtener(id, this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos);
     }
     async actualizar(id, dto, req) {
-        const datos = await this.agenteHumanoService.actualizar(id, dto, req.user.id, req.user.clienteId);
+        const datos = await this.agenteHumanoService.actualizar(id, dto, req.user.id, this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos, 'Agente humano actualizado.');
     }
     async eliminar(id, req) {
-        await this.agenteHumanoService.eliminar(id, req.user.id, req.user.clienteId);
+        await this.agenteHumanoService.eliminar(id, req.user.id, this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(null, 'Agente humano eliminado y credenciales desactivadas.');
     }
     async cambiarDisponibilidad(id, dto, req) {
-        const datos = await this.agenteHumanoService.cambiarDisponibilidad(id, dto.estado, req.user.clienteId);
+        const datos = await this.agenteHumanoService.cambiarDisponibilidad(id, dto.estado, this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos);
     }
     async estadisticas(id, req) {
-        const datos = await this.agenteHumanoService.estadisticas(id, req.user.clienteId);
+        const datos = await this.agenteHumanoService.estadisticas(id, this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos);
     }
     async actividad(id, req) {
-        const datos = await this.agenteHumanoService.actividad(id, req.user.clienteId);
+        const datos = await this.agenteHumanoService.actividad(id, this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos);
+    }
+    clienteIdDe(req) {
+        const deSesion = req.user?.clienteId;
+        if (deSesion)
+            return String(deSesion);
+        const deQuery = req.query?.clienteId;
+        if (deQuery)
+            return String(deQuery);
+        throw new common_1.BadRequestException('Debes indicar el cliente a administrar (parametro clienteId). Selecciona un cliente en el modulo Clientes.');
     }
     esAgenteHumano(req) {
         const roles = req.user?.roles ?? [];

@@ -65,12 +65,19 @@ export class ToolExecutorService {
 
   private async buscarProducto(input: any, ctx: ToolContexto): Promise<ToolResult> {
     const productos = await this.productoService.buscar(ctx.clienteId, input.termino, input.categoria)
-    const texto = this.productoService.formatearParaClaude(productos)
+    let texto = this.productoService.formatearParaClaude(productos)
 
     // Convertir nombres de archivo a URLs públicas (máx 3 imágenes en total)
     const imagenes = productos
       .flatMap(p => this.productoService.resolverUrlsImagenes(p.imagenes || []))
       .slice(0, 3)
+
+    // Informar al modelo si se adjuntaron fotos, para que no afirme envíos que no ocurrieron
+    if (productos.length > 0) {
+      texto += imagenes.length
+        ? `\n\n[Sistema: se adjuntaron ${imagenes.length} imagen(es) del producto al chat del cliente]`
+        : '\n\n[Sistema: estos productos NO tienen imágenes cargadas — no se envió ninguna foto al cliente]'
+    }
 
     return { texto, imagenes }
   }

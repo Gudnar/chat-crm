@@ -141,10 +141,10 @@ export class CambiarEstadoOportunidadDto {
 }
 
 export class RegistrarSeguimientoDto {
-  @ApiProperty({ example: 'Se llamó al cliente, pidió la cotización por correo' })
+  @ApiPropertyOptional({ example: 'Se llamó al cliente, pidió la cotización por correo' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  nota: string
+  nota?: string
 
   @ApiPropertyOptional({ example: 'Enviar cotización por correo' })
   @IsOptional()
@@ -163,4 +163,15 @@ export class AsignarOportunidadDto {
   @IsString()
   @IsNotEmpty()
   usuarioId: string
+}
+
+export class EditarHistorialDto {
+  @ApiProperty({ description: 'Índice de la entrada dentro del historial' })
+  @IsNumber()
+  indice: number
+
+  @ApiProperty({ example: 'Texto corregido del seguimiento' })
+  @IsString()
+  @IsNotEmpty()
+  detalles: string
 }

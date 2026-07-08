@@ -9,6 +9,10 @@ export interface HistorialOportunidad {
   usuarioId: string
   usuarioNombre: string
   detalles: string
+  // Solo para entradas corregidas después (seguimientos y notas)
+  editado?: boolean
+  editadoPor?: string
+  editadoEn?: string
 }
 
 @Entity({ name: 'oportunidad_venta', schema: process.env.DB_SCHEMA || 'public' })

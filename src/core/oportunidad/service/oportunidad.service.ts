@@ -293,14 +293,55 @@ export class OportunidadService extends BaseService {
     clienteId: string,
     usuarioId: string,
   ): Promise<OportunidadVenta> {
+    if (!dto.nota && !dto.proximaAccion) {
+      throw new BadRequestException('Debes escribir una nota o indicar la próxima acción')
+    }
+
     const o = await this.obtener(id, clienteId)
     const usuarioNombre = await this.nombreUsuario(usuarioId)
 
-    o.historial = [...(o.historial || []), this.entradaHistorial('seguimiento', usuarioId, usuarioNombre, dto.nota)]
+    // Se puede registrar solo la nota, solo la próxima acción, o ambas
+    const detalles = dto.nota
+      ? dto.nota
+      : `Programó próxima acción: ${dto.proximaAccion}${dto.proximaAccionFecha ? ` (límite ${new Date(dto.proximaAccionFecha).toLocaleString('es-BO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })})` : ''}`
+
+    o.historial = [...(o.historial || []), this.entradaHistorial('seguimiento', usuarioId, usuarioNombre, detalles)]
     if (dto.proximaAccion !== undefined) o.proximaAccion = dto.proximaAccion || null
     if (dto.proximaAccionFecha !== undefined) {
       o.proximaAccionFecha = dto.proximaAccionFecha ? new Date(dto.proximaAccionFecha) : null
     }
+    o.transaccion = Transacccion.ACTUALIZAR
+    o.usuarioModificacion = usuarioId
+    return this.repo.save(o)
+  }
+
+  /** Edita el texto de una entrada del historial (solo seguimientos y notas, queda marcada como editada). */
+  async editarHistorial(
+    id: string,
+    indice: number,
+    detalles: string,
+    clienteId: string,
+    usuarioId: string,
+  ): Promise<OportunidadVenta> {
+    const o = await this.obtener(id, clienteId)
+    const historial = [...(o.historial || [])]
+    const entrada = historial[indice]
+
+    if (!entrada) throw new BadRequestException('La entrada del historial no existe')
+    if (!['seguimiento', 'nota'].includes(entrada.accion)) {
+      throw new BadRequestException('Solo se pueden editar seguimientos y notas (los cambios de estado y asignaciones son registro de auditoría)')
+    }
+
+    const usuarioNombre = await this.nombreUsuario(usuarioId)
+    historial[indice] = {
+      ...entrada,
+      detalles,
+      editado: true,
+      editadoPor: usuarioNombre,
+      editadoEn: new Date().toISOString(),
+    } as any
+
+    o.historial = historial
     o.transaccion = Transacccion.ACTUALIZAR
     o.usuarioModificacion = usuarioId
     return this.repo.save(o)

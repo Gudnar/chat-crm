@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -42,27 +43,27 @@ export class AgenteHumanoController {
   @Get()
   @Roles(Rol.SUPER_ADMIN, Rol.ADMIN_CLIENTE)
   async listar(@Request() req: any): Promise<SuccessResponseDto> {
-    const datos = await this.agenteHumanoService.listar(req.user.clienteId)
+    const datos = await this.agenteHumanoService.listar(this.clienteIdDe(req))
     return new SuccessResponseDto(datos)
   }
 
   @Post()
   @Roles(Rol.SUPER_ADMIN, Rol.ADMIN_CLIENTE)
   async crear(@Body() dto: CreateAgenteHumanoDto, @Request() req: any): Promise<SuccessResponseDto> {
-    const datos = await this.agenteHumanoService.crear(dto, req.user.id, req.user.clienteId)
+    const datos = await this.agenteHumanoService.crear(dto, req.user.id, this.clienteIdDe(req))
     return new SuccessResponseDto(datos, 'Agente humano creado. Ya puede iniciar sesión con sus credenciales.')
   }
 
   @Get('disponibles')
   async disponibles(@Request() req: any): Promise<SuccessResponseDto> {
-    const datos = await this.agenteHumanoService.obtenerDisponibles(req.user.clienteId)
+    const datos = await this.agenteHumanoService.obtenerDisponibles(this.clienteIdDe(req))
     return new SuccessResponseDto(datos)
   }
 
   @Get('equipo/estadisticas')
   @Roles(Rol.SUPER_ADMIN, Rol.ADMIN_CLIENTE)
   async estadisticasEquipo(@Request() req: any): Promise<SuccessResponseDto> {
-    const datos = await this.agenteHumanoService.estadisticasEquipo(req.user.clienteId)
+    const datos = await this.agenteHumanoService.estadisticasEquipo(this.clienteIdDe(req))
     return new SuccessResponseDto(datos)
   }
 
@@ -71,7 +72,7 @@ export class AgenteHumanoController {
   @Get('cola')
   @Roles(Rol.SUPER_ADMIN, Rol.ADMIN_CLIENTE, Rol.AGENTE_HUMANO)
   async cola(@Request() req: any): Promise<SuccessResponseDto> {
-    const datos = await this.asignacionService.colaSinAsignar(req.user.clienteId)
+    const datos = await this.asignacionService.colaSinAsignar(this.clienteIdDe(req))
     return new SuccessResponseDto(datos)
   }
 
@@ -83,14 +84,14 @@ export class AgenteHumanoController {
       const propio = await this.agentePropio(req)
       dto.agenteHumanoId = propio.id
     }
-    const datos = await this.asignacionService.asignar(dto, req.user.id, req.user.clienteId)
+    const datos = await this.asignacionService.asignar(dto, req.user.id, this.clienteIdDe(req))
     return new SuccessResponseDto(datos, 'Conversación asignada correctamente.')
   }
 
   @Post('asignacion-automatica')
   @Roles(Rol.SUPER_ADMIN, Rol.ADMIN_CLIENTE)
   async asignacionAutomatica(@Request() req: any): Promise<SuccessResponseDto> {
-    const datos = await this.asignacionService.asignacionAutomatica(req.user.id, req.user.clienteId)
+    const datos = await this.asignacionService.asignacionAutomatica(req.user.id, this.clienteIdDe(req))
     return new SuccessResponseDto(datos, `${datos.asignadas} conversación(es) asignada(s).`)
   }
 
@@ -102,7 +103,7 @@ export class AgenteHumanoController {
     @Request() req: any,
   ): Promise<SuccessResponseDto> {
     const actor = await this.resolverActor(req)
-    const datos = await this.asignacionService.cerrar(id, dto, actor, req.user.clienteId)
+    const datos = await this.asignacionService.cerrar(id, dto, actor, this.clienteIdDe(req))
     return new SuccessResponseDto(datos, 'Conversación marcada como resuelta.')
   }
 
@@ -110,7 +111,7 @@ export class AgenteHumanoController {
   @Roles(Rol.SUPER_ADMIN, Rol.ADMIN_CLIENTE, Rol.AGENTE_HUMANO)
   async devolverAIa(@Param('id') id: string, @Request() req: any): Promise<SuccessResponseDto> {
     const actor = await this.resolverActor(req)
-    const datos = await this.asignacionService.devolverAIa(id, actor, req.user.clienteId)
+    const datos = await this.asignacionService.devolverAIa(id, actor, this.clienteIdDe(req))
     return new SuccessResponseDto(datos, 'Conversación devuelta al agente IA.')
   }
 
@@ -120,7 +121,7 @@ export class AgenteHumanoController {
   @Roles(Rol.AGENTE_HUMANO)
   async miPerfil(@Request() req: any): Promise<SuccessResponseDto> {
     const propio = await this.agentePropio(req)
-    const datos = await this.agenteHumanoService.estadisticas(propio.id, req.user.clienteId)
+    const datos = await this.agenteHumanoService.estadisticas(propio.id, this.clienteIdDe(req))
     return new SuccessResponseDto(datos)
   }
 
@@ -128,7 +129,7 @@ export class AgenteHumanoController {
   @Roles(Rol.AGENTE_HUMANO)
   async miDisponibilidad(@Body() dto: CambiarDisponibilidadDto, @Request() req: any): Promise<SuccessResponseDto> {
     const propio = await this.agentePropio(req)
-    const datos = await this.agenteHumanoService.cambiarDisponibilidad(propio.id, dto.estado, req.user.clienteId)
+    const datos = await this.agenteHumanoService.cambiarDisponibilidad(propio.id, dto.estado, this.clienteIdDe(req))
     return new SuccessResponseDto(datos, `Ahora estás ${dto.estado}.`)
   }
 
@@ -136,7 +137,7 @@ export class AgenteHumanoController {
   @Roles(Rol.AGENTE_HUMANO)
   async misConversaciones(@Request() req: any): Promise<SuccessResponseDto> {
     const propio = await this.agentePropio(req)
-    const datos = await this.asignacionService.misConversaciones(propio.id, req.user.clienteId)
+    const datos = await this.asignacionService.misConversaciones(propio.id, this.clienteIdDe(req))
     return new SuccessResponseDto(datos)
   }
 
@@ -145,7 +146,7 @@ export class AgenteHumanoController {
   @Get(':id')
   @Roles(Rol.SUPER_ADMIN, Rol.ADMIN_CLIENTE)
   async obtener(@Param('id') id: string, @Request() req: any): Promise<SuccessResponseDto> {
-    const datos = await this.agenteHumanoService.obtener(id, req.user.clienteId)
+    const datos = await this.agenteHumanoService.obtener(id, this.clienteIdDe(req))
     return new SuccessResponseDto(datos)
   }
 
@@ -156,14 +157,14 @@ export class AgenteHumanoController {
     @Body() dto: UpdateAgenteHumanoDto,
     @Request() req: any,
   ): Promise<SuccessResponseDto> {
-    const datos = await this.agenteHumanoService.actualizar(id, dto, req.user.id, req.user.clienteId)
+    const datos = await this.agenteHumanoService.actualizar(id, dto, req.user.id, this.clienteIdDe(req))
     return new SuccessResponseDto(datos, 'Agente humano actualizado.')
   }
 
   @Delete(':id')
   @Roles(Rol.SUPER_ADMIN, Rol.ADMIN_CLIENTE)
   async eliminar(@Param('id') id: string, @Request() req: any): Promise<SuccessResponseDto> {
-    await this.agenteHumanoService.eliminar(id, req.user.id, req.user.clienteId)
+    await this.agenteHumanoService.eliminar(id, req.user.id, this.clienteIdDe(req))
     return new SuccessResponseDto(null, 'Agente humano eliminado y credenciales desactivadas.')
   }
 
@@ -174,25 +175,41 @@ export class AgenteHumanoController {
     @Body() dto: CambiarDisponibilidadDto,
     @Request() req: any,
   ): Promise<SuccessResponseDto> {
-    const datos = await this.agenteHumanoService.cambiarDisponibilidad(id, dto.estado, req.user.clienteId)
+    const datos = await this.agenteHumanoService.cambiarDisponibilidad(id, dto.estado, this.clienteIdDe(req))
     return new SuccessResponseDto(datos)
   }
 
   @Get(':id/estadisticas')
   @Roles(Rol.SUPER_ADMIN, Rol.ADMIN_CLIENTE)
   async estadisticas(@Param('id') id: string, @Request() req: any): Promise<SuccessResponseDto> {
-    const datos = await this.agenteHumanoService.estadisticas(id, req.user.clienteId)
+    const datos = await this.agenteHumanoService.estadisticas(id, this.clienteIdDe(req))
     return new SuccessResponseDto(datos)
   }
 
   @Get(':id/actividad')
   @Roles(Rol.SUPER_ADMIN, Rol.ADMIN_CLIENTE)
   async actividad(@Param('id') id: string, @Request() req: any): Promise<SuccessResponseDto> {
-    const datos = await this.agenteHumanoService.actividad(id, req.user.clienteId)
+    const datos = await this.agenteHumanoService.actividad(id, this.clienteIdDe(req))
     return new SuccessResponseDto(datos)
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
+
+  /**
+   * Multi-tenancy: los agentes humanos SIEMPRE se operan dentro de un cliente.
+   * ADMIN_CLIENTE y AGENTE_HUMANO usan el cliente de su sesion; el SUPER_ADMIN
+   * (sin cliente propio) debe indicar ?clienteId=<id> del cliente que administra.
+   * Sin esto, TypeORM ignora el filtro null y mezclaria agentes de todos los clientes.
+   */
+  private clienteIdDe(req: any): string {
+    const deSesion = req.user?.clienteId
+    if (deSesion) return String(deSesion)
+    const deQuery = req.query?.clienteId
+    if (deQuery) return String(deQuery)
+    throw new BadRequestException(
+      'Debes indicar el cliente a administrar (parametro clienteId). Selecciona un cliente en el modulo Clientes.',
+    )
+  }
 
   private esAgenteHumano(req: any): boolean {
     const roles: string[] = req.user?.roles ?? []

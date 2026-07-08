@@ -29,10 +29,14 @@ export declare class CambiarEstadoOportunidadDto {
     motivo?: string;
 }
 export declare class RegistrarSeguimientoDto {
-    nota: string;
+    nota?: string;
     proximaAccion?: string;
     proximaAccionFecha?: string;
 }
 export declare class AsignarOportunidadDto {
     usuarioId: string;
+}
+export declare class EditarHistorialDto {
+    indice: number;
+    detalles: string;
 }

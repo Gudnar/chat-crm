@@ -140,10 +140,13 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
         const messages = mensajes.map(m => ({ role: m.role, content: m.content }));
         const pendingImages = [];
         try {
+            const maxTokens = tools.length > 0
+                ? Math.max(Number(agente.maxTokens) || 0, 700)
+                : (Number(agente.maxTokens) || 256);
             for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
                 const body = {
                     model: agente.modelo || 'claude-haiku-4-5',
-                    max_tokens: agente.maxTokens || 256,
+                    max_tokens: maxTokens,
                     system: systemPrompt,
                     messages,
                 };
@@ -151,8 +154,23 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
                     body.tools = tools;
                 const res = await axios_1.default.post(ANTHROPIC_API, body, { headers });
                 const { stop_reason, content } = res.data;
+                if (stop_reason === 'max_tokens') {
+                    this.logger.warn(`[WA] Respuesta cortada por max_tokens (${maxTokens}) — considere aumentar maxTokens del agente ${agente.id}`);
+                }
                 if (stop_reason === 'end_turn') {
-                    const textBlock = content.find((b) => b.type === 'text');
+                    const textBlock = content.find((b) => b.type === 'text' && b.text?.trim());
+                    if (!textBlock && i < MAX_TOOL_ITERATIONS - 1) {
+                        this.logger.warn('[WA] end_turn sin texto — se pide al modelo redactar la respuesta');
+                        const nudge = { type: 'text', text: '[Sistema: las acciones fueron registradas. Escribe AHORA tu respuesta de texto para el cliente.]' };
+                        const ultimo = messages[messages.length - 1];
+                        if (ultimo?.role === 'user') {
+                            if (Array.isArray(ultimo.content))
+                                ultimo.content.push(nudge);
+                            else
+                                ultimo.content = [{ type: 'text', text: ultimo.content }, nudge];
+                        }
+                        continue;
+                    }
                     return { respuesta: textBlock?.text ?? null, imagenes: pendingImages };
                 }
                 if (stop_reason === 'tool_use') {

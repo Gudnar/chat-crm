@@ -180,10 +180,17 @@ export class WhatsappWebhookService {
     const pendingImages: string[] = []
 
     try {
+      // Con herramientas, un presupuesto bajo puede cortar la respuesta A MITAD de un
+      // tool_use: la API descarta el bloque incompleto y solo llega el texto previo
+      // ("un segundo...") sin ejecutar nada. Piso de 700 tokens cuando hay tools.
+      const maxTokens = tools.length > 0
+        ? Math.max(Number(agente.maxTokens) || 0, 700)
+        : (Number(agente.maxTokens) || 256)
+
       for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
         const body: any = {
           model: agente.modelo || 'claude-haiku-4-5',
-          max_tokens: agente.maxTokens || 256,
+          max_tokens: maxTokens,
           system: systemPrompt,
           messages,
         }
@@ -192,8 +199,24 @@ export class WhatsappWebhookService {
         const res = await axios.post(ANTHROPIC_API, body, { headers })
         const { stop_reason, content } = res.data
 
+        if (stop_reason === 'max_tokens') {
+          this.logger.warn(`[WA] Respuesta cortada por max_tokens (${maxTokens}) — considere aumentar maxTokens del agente ${agente.id}`)
+        }
+
         if (stop_reason === 'end_turn') {
-          const textBlock = content.find((b: any) => b.type === 'text')
+          const textBlock = content.find((b: any) => b.type === 'text' && b.text?.trim())
+          if (!textBlock && i < MAX_TOOL_ITERATIONS - 1) {
+            // Turno "mudo": el modelo usó herramientas pero terminó sin escribir nada.
+            // Sin este empujón, el cliente no recibiría ningún mensaje.
+            this.logger.warn('[WA] end_turn sin texto — se pide al modelo redactar la respuesta')
+            const nudge = { type: 'text', text: '[Sistema: las acciones fueron registradas. Escribe AHORA tu respuesta de texto para el cliente.]' }
+            const ultimo: any = messages[messages.length - 1]
+            if (ultimo?.role === 'user') {
+              if (Array.isArray(ultimo.content)) ultimo.content.push(nudge)
+              else ultimo.content = [{ type: 'text', text: ultimo.content }, nudge]
+            }
+            continue
+          }
           return { respuesta: textBlock?.text ?? null, imagenes: pendingImages }
         }
 

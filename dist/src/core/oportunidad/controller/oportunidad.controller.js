@@ -65,6 +65,10 @@ let OportunidadController = class OportunidadController {
         const datos = await this.oportunidadService.registrarSeguimiento(id, dto, req.user.clienteId, req.user.id);
         return new success_response_dto_1.SuccessResponseDto(datos, 'Seguimiento registrado');
     }
+    async editarHistorial(id, dto, req) {
+        const datos = await this.oportunidadService.editarHistorial(id, dto.indice, dto.detalles, req.user.clienteId, req.user.id);
+        return new success_response_dto_1.SuccessResponseDto(datos, 'Entrada del historial corregida');
+    }
     async eliminar(id, req) {
         await this.oportunidadService.eliminar(id, req.user.clienteId, req.user.id);
         return new success_response_dto_1.SuccessResponseDto(null, 'Oportunidad eliminada');
@@ -149,6 +153,15 @@ __decorate([
     __metadata("design:paramtypes", [String, oportunidad_dto_1.RegistrarSeguimientoDto, Object]),
     __metadata("design:returntype", Promise)
 ], OportunidadController.prototype, "registrarSeguimiento", null);
+__decorate([
+    (0, common_1.Patch)(':id/historial'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, oportunidad_dto_1.EditarHistorialDto, Object]),
+    __metadata("design:returntype", Promise)
+], OportunidadController.prototype, "editarHistorial", null);
 __decorate([
     (0, common_1.Delete)(':id'),
     __param(0, (0, common_1.Param)('id')),

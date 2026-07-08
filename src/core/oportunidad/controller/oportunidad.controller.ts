@@ -8,6 +8,7 @@ import {
   AsignarOportunidadDto,
   CambiarEstadoOportunidadDto,
   CreateOportunidadDto,
+  EditarHistorialDto,
   RegistrarSeguimientoDto,
   UpdateOportunidadDto,
 } from '../dto/oportunidad.dto'
@@ -114,6 +115,16 @@ export class OportunidadController {
   ): Promise<SuccessResponseDto> {
     const datos = await this.oportunidadService.registrarSeguimiento(id, dto, req.user.clienteId, req.user.id)
     return new SuccessResponseDto(datos, 'Seguimiento registrado')
+  }
+
+  @Patch(':id/historial')
+  async editarHistorial(
+    @Param('id') id: string,
+    @Body() dto: EditarHistorialDto,
+    @Request() req: any,
+  ): Promise<SuccessResponseDto> {
+    const datos = await this.oportunidadService.editarHistorial(id, dto.indice, dto.detalles, req.user.clienteId, req.user.id)
+    return new SuccessResponseDto(datos, 'Entrada del historial corregida')
   }
 
   @Delete(':id')

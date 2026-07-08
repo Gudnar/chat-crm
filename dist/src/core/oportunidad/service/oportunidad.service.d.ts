@@ -32,6 +32,7 @@ export declare class OportunidadService extends BaseService {
     cambiarEstado(id: string, nuevoEstado: string, motivo: string | undefined, clienteId: string, usuarioId: string): Promise<OportunidadVenta>;
     asignar(id: string, asignadoA: string, clienteId: string, usuarioId: string): Promise<OportunidadVenta>;
     registrarSeguimiento(id: string, dto: RegistrarSeguimientoDto, clienteId: string, usuarioId: string): Promise<OportunidadVenta>;
+    editarHistorial(id: string, indice: number, detalles: string, clienteId: string, usuarioId: string): Promise<OportunidadVenta>;
     eliminar(id: string, clienteId: string, usuarioId: string): Promise<void>;
     estadisticas(clienteId: string, asignadoA?: string): Promise<any>;
     usuariosAsignables(clienteId: string): Promise<Array<{

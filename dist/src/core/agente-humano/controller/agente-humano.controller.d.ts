@@ -24,6 +24,7 @@ export declare class AgenteHumanoController {
     cambiarDisponibilidad(id: string, dto: CambiarDisponibilidadDto, req: any): Promise<SuccessResponseDto>;
     estadisticas(id: string, req: any): Promise<SuccessResponseDto>;
     actividad(id: string, req: any): Promise<SuccessResponseDto>;
+    private clienteIdDe;
     private esAgenteHumano;
     private agentePropio;
     private resolverActor;

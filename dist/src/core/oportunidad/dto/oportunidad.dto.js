@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AsignarOportunidadDto = exports.RegistrarSeguimientoDto = exports.CambiarEstadoOportunidadDto = exports.UpdateOportunidadDto = exports.CreateOportunidadDto = void 0;
+exports.EditarHistorialDto = exports.AsignarOportunidadDto = exports.RegistrarSeguimientoDto = exports.CambiarEstadoOportunidadDto = exports.UpdateOportunidadDto = exports.CreateOportunidadDto = void 0;
 const swagger_1 = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 const constants_1 = require("../../../common/constants");
@@ -181,9 +181,9 @@ exports.CambiarEstadoOportunidadDto = CambiarEstadoOportunidadDto;
 class RegistrarSeguimientoDto {
 }
 __decorate([
-    (0, swagger_1.ApiProperty)({ example: 'Se llamó al cliente, pidió la cotización por correo' }),
+    (0, swagger_1.ApiPropertyOptional)({ example: 'Se llamó al cliente, pidió la cotización por correo' }),
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], RegistrarSeguimientoDto.prototype, "nota", void 0);
 __decorate([
@@ -209,4 +209,18 @@ __decorate([
     __metadata("design:type", String)
 ], AsignarOportunidadDto.prototype, "usuarioId", void 0);
 exports.AsignarOportunidadDto = AsignarOportunidadDto;
+class EditarHistorialDto {
+}
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: 'Índice de la entrada dentro del historial' }),
+    (0, class_validator_1.IsNumber)(),
+    __metadata("design:type", Number)
+], EditarHistorialDto.prototype, "indice", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 'Texto corregido del seguimiento' }),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsNotEmpty)(),
+    __metadata("design:type", String)
+], EditarHistorialDto.prototype, "detalles", void 0);
+exports.EditarHistorialDto = EditarHistorialDto;
 //# sourceMappingURL=oportunidad.dto.js.map

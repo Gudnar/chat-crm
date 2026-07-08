@@ -8,6 +8,7 @@ export declare class HerramientaController {
     constructor(herramientaService: HerramientaService, agenteService: AgenteService);
     listar(agenteId: string, req: any): Promise<SuccessResponseDto>;
     crear(dto: CreateHerramientaDto, req: any): Promise<SuccessResponseDto>;
+    crearDefaults(agenteId: string, req: any): Promise<SuccessResponseDto>;
     actualizar(id: string, dto: UpdateHerramientaDto, req: any): Promise<SuccessResponseDto>;
     eliminar(id: string, req: any): Promise<SuccessResponseDto>;
 }
