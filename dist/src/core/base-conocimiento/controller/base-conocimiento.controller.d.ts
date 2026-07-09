@@ -1,3 +1,5 @@
+/// <reference types="multer" />
+import { Response } from 'express';
 import { BaseConocimientoService } from '../service/base-conocimiento.service';
 import { AgenteService } from '../../agente/service/agente.service';
 import { CreateBaseConocimientoDto, UpdateBaseConocimientoDto } from '../dto/create-base-conocimiento.dto';
@@ -8,6 +10,8 @@ export declare class BaseConocimientoController {
     constructor(baseConocimientoService: BaseConocimientoService, agenteService: AgenteService);
     listar(agenteId: string, req: any): Promise<SuccessResponseDto>;
     crear(agenteId: string, dto: CreateBaseConocimientoDto, req: any): Promise<SuccessResponseDto>;
+    exportarExcel(agenteId: string, req: any, res: Response): Promise<void>;
+    importarExcel(agenteId: string, file: Express.Multer.File, req: any): Promise<SuccessResponseDto>;
     actualizar(agenteId: string, id: string, dto: UpdateBaseConocimientoDto, req: any): Promise<SuccessResponseDto>;
     eliminar(agenteId: string, id: string, req: any): Promise<SuccessResponseDto>;
 }

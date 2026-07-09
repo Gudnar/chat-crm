@@ -14,6 +14,7 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BaseConocimientoController = void 0;
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
 const swagger_1 = require("@nestjs/swagger");
 const jwt_auth_guard_1 = require("../../authentication/guards/jwt-auth.guard");
 const base_conocimiento_service_1 = require("../service/base-conocimiento.service");
@@ -34,6 +35,23 @@ let BaseConocimientoController = class BaseConocimientoController {
         await this.agenteService.obtener(agenteId, req.user.clienteId);
         const datos = await this.baseConocimientoService.crear({ ...dto, agenteId }, req.user.id);
         return new success_response_dto_1.SuccessResponseDto(datos, 'Pregunta frecuente creada correctamente');
+    }
+    async exportarExcel(agenteId, req, res) {
+        await this.agenteService.obtener(agenteId, req.user.clienteId);
+        const buffer = await this.baseConocimientoService.exportarExcel(agenteId);
+        const fecha = new Date().toISOString().split('T')[0];
+        res.set({
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': `attachment; filename="base-conocimiento-agente${agenteId}-${fecha}.xlsx"`,
+        });
+        res.send(buffer);
+    }
+    async importarExcel(agenteId, file, req) {
+        await this.agenteService.obtener(agenteId, req.user.clienteId);
+        if (!file)
+            return new success_response_dto_1.SuccessResponseDto(null, 'Archivo requerido');
+        const resultado = await this.baseConocimientoService.importarExcel(file.buffer, agenteId, req.user.id);
+        return new success_response_dto_1.SuccessResponseDto(resultado, `Importación completada: ${resultado.creadas} creadas, ${resultado.actualizadas} actualizadas`);
     }
     async actualizar(agenteId, id, dto, req) {
         await this.agenteService.obtener(agenteId, req.user.clienteId);
@@ -63,6 +81,26 @@ __decorate([
     __metadata("design:paramtypes", [String, create_base_conocimiento_dto_1.CreateBaseConocimientoDto, Object]),
     __metadata("design:returntype", Promise)
 ], BaseConocimientoController.prototype, "crear", null);
+__decorate([
+    (0, common_1.Get)('exportar/excel'),
+    __param(0, (0, common_1.Param)('agenteId')),
+    __param(1, (0, common_1.Request)()),
+    __param(2, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object]),
+    __metadata("design:returntype", Promise)
+], BaseConocimientoController.prototype, "exportarExcel", null);
+__decorate([
+    (0, common_1.Post)('importar/excel'),
+    (0, swagger_1.ApiConsumes)('multipart/form-data'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('archivo')),
+    __param(0, (0, common_1.Param)('agenteId')),
+    __param(1, (0, common_1.UploadedFile)()),
+    __param(2, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, Object]),
+    __metadata("design:returntype", Promise)
+], BaseConocimientoController.prototype, "importarExcel", null);
 __decorate([
     (0, common_1.Put)(':id'),
     __param(0, (0, common_1.Param)('agenteId')),
