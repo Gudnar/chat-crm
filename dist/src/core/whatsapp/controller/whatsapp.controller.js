@@ -102,14 +102,23 @@ let WhatsappController = WhatsappController_1 = class WhatsappController {
     }
     async obtenerConfig(req) {
         const config = await this.waService.obtenerConfig(req.user.clienteId);
-        return { ...config, accessToken: config.accessToken ? '••••••••••••••••' : '' };
+        return {
+            ...config,
+            accessToken: config.accessToken ? '••••••••••••••••' : '',
+            _hasAccessToken: !!config.accessToken
+        };
     }
     async guardarConfig(dto, req) {
         await this.waService.guardarConfig(req.user.clienteId, dto, req.user.id);
         return new success_response_dto_1.SuccessResponseDto(null, 'Configuración WhatsApp guardada correctamente');
     }
-    async testConexion(dto) {
-        return this.waService.testConexion(dto.accessToken, dto.phoneNumberId);
+    async testConexion(dto, req) {
+        let token = dto.accessToken;
+        if (!token) {
+            const config = await this.waService.obtenerConfig(req.user.clienteId);
+            token = config.accessToken;
+        }
+        return this.waService.testConexion(token, dto.phoneNumberId);
     }
     async obtenerEstado(req) {
         return this.waService.obtenerEstadisticas(req.user.clienteId);
@@ -157,8 +166,9 @@ __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Post)('test-connection'),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Request)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [whatsapp_dto_1.TestConexionDto]),
+    __metadata("design:paramtypes", [whatsapp_dto_1.TestConexionDto, Object]),
     __metadata("design:returntype", Promise)
 ], WhatsappController.prototype, "testConexion", null);
 __decorate([

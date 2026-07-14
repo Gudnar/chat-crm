@@ -108,7 +108,11 @@ export class WhatsappController {
   @Get('config')
   async obtenerConfig(@Request() req: any) {
     const config = await this.waService.obtenerConfig(req.user.clienteId)
-    return { ...config, accessToken: config.accessToken ? '••••••••••••••••' : '' }
+    return {
+      ...config,
+      accessToken: config.accessToken ? '••••••••••••••••' : '',
+      _hasAccessToken: !!config.accessToken // Flag para saber si hay token guardado
+    }
   }
 
   @UseGuards(JwtAuthGuard)
@@ -120,8 +124,14 @@ export class WhatsappController {
 
   @UseGuards(JwtAuthGuard)
   @Post('test-connection')
-  async testConexion(@Body() dto: TestConexionDto) {
-    return this.waService.testConexion(dto.accessToken, dto.phoneNumberId)
+  async testConexion(@Body() dto: TestConexionDto, @Request() req: any) {
+    // If accessToken not provided in request, use the saved one
+    let token = dto.accessToken;
+    if (!token) {
+      const config = await this.waService.obtenerConfig(req.user.clienteId);
+      token = config.accessToken;
+    }
+    return this.waService.testConexion(token, dto.phoneNumberId)
   }
 
   @UseGuards(JwtAuthGuard)

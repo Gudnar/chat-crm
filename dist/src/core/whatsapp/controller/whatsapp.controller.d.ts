@@ -18,6 +18,7 @@ export declare class WhatsappController {
     recibirWebhook(body: any): Promise<string>;
     obtenerConfig(req: any): Promise<{
         accessToken: string;
+        _hasAccessToken: boolean;
         phoneNumberId: string;
         wabaId: string;
         verifyToken: string;
@@ -25,7 +26,7 @@ export declare class WhatsappController {
         enabled: boolean;
     }>;
     guardarConfig(dto: WhatsappConfigDto, req: any): Promise<SuccessResponseDto>;
-    testConexion(dto: TestConexionDto): Promise<{
+    testConexion(dto: TestConexionDto, req: any): Promise<{
         valida: boolean;
         info?: any;
         mensaje: string;
