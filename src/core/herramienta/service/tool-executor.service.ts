@@ -130,43 +130,67 @@ export class ToolExecutorService {
    */
   private async enviarRecurso(input: any, ctx: ToolContexto): Promise<ToolResult> {
     const termino = String(input?.termino || '').trim()
+    this.logger.log(`[enviarRecurso] START: termino="${termino}", clienteId=${ctx.clienteId}, agenteId=${ctx.agenteId}`)
+
     if (!termino) {
       return { texto: '[Sistema: falta el término de búsqueda para enviar_recurso. No se envió nada.]' }
     }
 
-    const encontrados = await this.recursoService.buscarPorKeywords(ctx.clienteId, termino)
-    // Un recurso con agenteId asignado solo lo puede enviar ESE agente; sin agenteId es compartido.
-    const visibles = encontrados.filter(r => !r.agenteId || r.agenteId === ctx.agenteId)
+    try {
+      this.logger.log(`[enviarRecurso] recursoService exists: ${!!this.recursoService}`)
+      const encontrados = await this.recursoService.buscarPorKeywords(ctx.clienteId, termino)
+      this.logger.log(`[enviarRecurso] buscarPorKeywords devolvió ${encontrados.length} resultado(s)`)
 
-    if (visibles.length === 0) {
-      this.logger.warn(`[Tool] enviar_recurso: sin resultados para "${termino}" (cliente ${ctx.clienteId})`)
-      return {
-        texto: `[Sistema: no se encontró ningún recurso para "${termino}". No hay archivo, no afirmes haberlo enviado. Pregunta al cliente qué necesita o intenta con otro término.]`,
+      // Un recurso con agenteId asignado solo lo puede enviar ESE agente; sin agenteId es compartido.
+      const visibles = encontrados.filter(r => !r.agenteId || r.agenteId === ctx.agenteId)
+      this.logger.log(`[enviarRecurso] después de filtrar por agente: ${visibles.length} visible(s)`)
+
+      if (visibles.length === 0) {
+        this.logger.warn(`[Tool] enviar_recurso: sin resultados para "${termino}" (cliente ${ctx.clienteId})`)
+        return {
+          texto: `[Sistema: no se encontró ningún recurso para "${termino}". No hay archivo, no afirmes haberlo enviado. Pregunta al cliente qué necesita o intenta con otro término.]`,
+        }
       }
-    }
 
-    if (visibles.length > 1) {
-      const nombres = visibles.slice(0, 5).map(r => `${r.nombre} (${r.tipo.toLowerCase()})`).join(', ')
-      return {
-        texto: `[Sistema: hay ${visibles.length} recursos que coinciden con "${termino}": ${nombres}. No se envió ninguno para evitar confusión. Pide al cliente que precise cuál necesita, o vuelve a llamar la herramienta con un término más específico.]`,
+      if (visibles.length > 1) {
+        const nombres = visibles.slice(0, 5).map(r => `${r.nombre} (${r.tipo.toLowerCase()})`).join(', ')
+        this.logger.log(`[enviarRecurso] múltiples resultados, no se envía nada automáticamente`)
+        return {
+          texto: `[Sistema: hay ${visibles.length} recursos que coinciden con "${termino}": ${nombres}. No se envió ninguno para evitar confusión. Pide al cliente que precise cuál necesita, o vuelve a llamar la herramienta con un término más específico.]`,
+        }
       }
-    }
 
-    const recurso = visibles[0]
-    const url = await this.recursoService.obtenerUrlPublica(recurso.id, ctx.clienteId)
-    const confirmacion = `[Sistema: se adjuntó "${recurso.nombre}" (${recurso.tipo.toLowerCase()}) al chat del cliente. Coméntalo con naturalidad en una línea y sigue la conversación.]`
+      const recurso = visibles[0]
+      this.logger.log(`[enviarRecurso] recurso encontrado: id=${recurso.id}, nombre="${recurso.nombre}", tipo=${recurso.tipo}, archivoLocal="${recurso.archivoLocal}"`)
 
-    switch (recurso.tipo) {
-      case TipoRecurso.PDF:
-        return { texto: confirmacion, documentos: [{ url, filename: this.nombreArchivo(recurso) }] }
-      case TipoRecurso.IMAGEN:
-        return { texto: confirmacion, imagenes: [url] }
-      case TipoRecurso.AUDIO:
-        return { texto: confirmacion, audios: [url] }
-      case TipoRecurso.VIDEO:
-        return { texto: confirmacion, videos: [url] }
-      default:
-        return { texto: `[Sistema: el recurso "${recurso.nombre}" tiene un tipo no soportado para envío automático.]` }
+      const url = await this.recursoService.obtenerUrlPublica(recurso.id, ctx.clienteId)
+      this.logger.log(`[enviarRecurso] obtenerUrlPublica devolvió: ${url}`)
+
+      const filename = this.nombreArchivo(recurso)
+      this.logger.log(`[enviarRecurso] nombreArchivo: ${filename}`)
+
+      const confirmacion = `[Sistema: se adjuntó "${recurso.nombre}" (${recurso.tipo.toLowerCase()}) al chat del cliente. Coméntalo con naturalidad en una línea y sigue la conversación.]`
+
+      switch (recurso.tipo) {
+        case TipoRecurso.PDF:
+          this.logger.log(`[enviarRecurso] enviando como PDF: ${url}`)
+          return { texto: confirmacion, documentos: [{ url, filename }] }
+        case TipoRecurso.IMAGEN:
+          this.logger.log(`[enviarRecurso] enviando como IMAGEN: ${url}`)
+          return { texto: confirmacion, imagenes: [url] }
+        case TipoRecurso.AUDIO:
+          this.logger.log(`[enviarRecurso] enviando como AUDIO: ${url}`)
+          return { texto: confirmacion, audios: [url] }
+        case TipoRecurso.VIDEO:
+          this.logger.log(`[enviarRecurso] enviando como VIDEO: ${url}`)
+          return { texto: confirmacion, videos: [url] }
+        default:
+          this.logger.warn(`[enviarRecurso] tipo no soportado: ${recurso.tipo}`)
+          return { texto: `[Sistema: el recurso "${recurso.nombre}" tiene un tipo no soportado para envío automático.]` }
+      }
+    } catch (err: any) {
+      this.logger.error(`[enviarRecurso] ERROR: ${err.message}`, err.stack)
+      return { texto: `[Sistema: error interno al buscar recurso: ${err.message}]` }
     }
   }
 
