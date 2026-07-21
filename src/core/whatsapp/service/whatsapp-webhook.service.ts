@@ -5,7 +5,7 @@ import { ConversacionService } from '../../conversacion/service/conversacion.ser
 import { AgenteService } from '../../agente/service/agente.service'
 import { ConfiguracionClienteService } from '../../cliente/service/configuracion-cliente.service'
 import { HerramientaService } from '../../herramienta/service/herramienta.service'
-import { ToolExecutorService } from '../../herramienta/service/tool-executor.service'
+import { ToolExecutorService, ToolDocumento } from '../../herramienta/service/tool-executor.service'
 import { BaseConocimientoService } from '../../base-conocimiento/service/base-conocimiento.service'
 import { WaWebhookMessage } from '../dto/whatsapp.dto'
 import { USUARIO_SISTEMA } from '../../../common/constants'
@@ -22,6 +22,9 @@ type ClaudeMessage = {
 interface LlamarClaudeResult {
   respuesta: string | null
   imagenes: string[]
+  documentos: ToolDocumento[]
+  audios: string[]
+  videos: string[]
 }
 
 @Injectable()
@@ -91,7 +94,7 @@ export class WhatsappWebhookService {
         .slice(-MAX_HISTORY_MESSAGES)
         .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
 
-      const { respuesta, imagenes } = await this.llamarClaude(agente, historial, clienteId, conversacion.id)
+      const { respuesta, imagenes, documentos, audios, videos } = await this.llamarClaude(agente, historial, clienteId, conversacion.id)
       if (!respuesta) return
 
       await this.conversacionService.agregarMensaje(conversacion.id, { role: 'assistant', content: respuesta })
@@ -103,7 +106,20 @@ export class WhatsappWebhookService {
         await this.waService.enviarImagen(from, imageUrl, '', config)
       }
 
-      this.logger.log(`[WA] Respuesta enviada a ${from} (${imagenes.length} imágenes adjuntas)`)
+      // Enviar documentos (catálogo PDF, fichas técnicas) después del texto
+      for (const doc of documentos) {
+        await this.waService.enviarDocumento(from, doc.url, doc.filename, '', config)
+      }
+
+      // Enviar audios/videos de recursos encontrados después del texto
+      for (const audioUrl of audios) {
+        await this.waService.enviarAudio(from, audioUrl, config)
+      }
+      for (const videoUrl of videos) {
+        await this.waService.enviarVideo(from, videoUrl, '', config)
+      }
+
+      this.logger.log(`[WA] Respuesta enviada a ${from} (${imagenes.length} imágenes, ${documentos.length} documentos, ${audios.length} audios, ${videos.length} videos)`)
     } catch (err: any) {
       this.logger.error(`[WA] Error procesando mensaje de ${from}: ${err.message}`)
     }
@@ -157,7 +173,7 @@ export class WhatsappWebhookService {
     const apiKey = apiKeyConfig?.valor
     if (!apiKey || apiKey.includes('•')) {
       this.logger.error('[WA] ANTHROPIC_API_KEY no configurada para este cliente')
-      return { respuesta: null, imagenes: [] }
+      return { respuesta: null, imagenes: [], documentos: [], audios: [], videos: [] }
     }
 
     // Construir system prompt: instrucciones del agente + base de conocimiento
@@ -178,6 +194,9 @@ export class WhatsappWebhookService {
 
     const messages: ClaudeMessage[] = mensajes.map(m => ({ role: m.role, content: m.content }))
     const pendingImages: string[] = []
+    const pendingDocs: ToolDocumento[] = []
+    const pendingAudios: string[] = []
+    const pendingVideos: string[] = []
 
     try {
       // Con herramientas, un presupuesto bajo puede cortar la respuesta A MITAD de un
@@ -217,7 +236,7 @@ export class WhatsappWebhookService {
             }
             continue
           }
-          return { respuesta: textBlock?.text ?? null, imagenes: pendingImages }
+          return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos }
         }
 
         if (stop_reason === 'tool_use') {
@@ -238,6 +257,18 @@ export class WhatsappWebhookService {
               pendingImages.push(...resultado.imagenes)
             }
 
+            if (resultado.documentos?.length) {
+              pendingDocs.push(...resultado.documentos)
+            }
+
+            if (resultado.audios?.length) {
+              pendingAudios.push(...resultado.audios)
+            }
+
+            if (resultado.videos?.length) {
+              pendingVideos.push(...resultado.videos)
+            }
+
             toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultado.texto })
           }
 
@@ -246,14 +277,52 @@ export class WhatsappWebhookService {
         }
 
         const textBlock = (content as any[])?.find((b: any) => b.type === 'text')
-        return { respuesta: textBlock?.text ?? null, imagenes: pendingImages }
+        return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos }
       }
 
       this.logger.warn('[WA] Se alcanzó el límite de iteraciones de tool_use')
-      return { respuesta: null, imagenes: [] }
+      return { respuesta: null, imagenes: [], documentos: [], audios: [], videos: [] }
     } catch (err: any) {
       this.logger.error(`[WA] Error llamando a Claude: ${err?.response?.data?.error?.message || err.message}`)
-      return { respuesta: null, imagenes: [] }
+      return { respuesta: null, imagenes: [], documentos: [], audios: [], videos: [] }
     }
+  }
+
+  /**
+   * Red de seguridad: elimina de la respuesta final cualquier fuga que jamás debe
+   * llegar al cliente. Ocurre sobre todo con modelos rápidos (Haiku) que a veces
+   * "escriben" la llamada a una herramienta como texto en lugar de invocarla.
+   *
+   * Solo filtra:
+   *  1. Bloques internos `[Sistema: ...]` (nudges que nunca son para el cliente).
+   *  2. Sintaxis de llamada de las herramientas REALES del agente, p. ej.
+   *     `buscar_producto("Geely")` o `escalar_agente({ ... })`. Se usan los nombres
+   *     exactos de las tools en contexto, así nunca se toca texto legítimo.
+   */
+  private sanitizarRespuesta(texto: string | null, tools: Array<{ name: string }>): string | null {
+    if (!texto) return texto
+    let limpio = texto
+
+    // 1. Bloques [Sistema: ...]
+    limpio = limpio.replace(/\[\s*Sistema:[^\]]*\]/gi, '')
+
+    // 2. Llamadas a herramientas escritas como texto (solo nombres reales del agente)
+    const nombres = tools
+      .map(t => t.name)
+      .filter(Boolean)
+      .map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    if (nombres.length) {
+      const re = new RegExp(`\`?\\b(?:${nombres.join('|')})\\s*\\([^)]*\\)\`?`, 'g')
+      const antes = limpio
+      limpio = limpio.replace(re, '')
+      if (limpio !== antes) {
+        this.logger.warn('[WA] Se filtró una fuga de sintaxis de herramienta en la respuesta al cliente')
+      }
+    }
+
+    // 3. Normalizar espacios y saltos sobrantes tras los recortes
+    limpio = limpio.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
+
+    return limpio || null
   }
 }

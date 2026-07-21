@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common'
+import { extname } from 'path'
 import { ConversacionService } from '../../conversacion/service/conversacion.service'
 import { ProductoService } from '../../producto/service/producto.service'
+import { ConfiguracionClienteService } from '../../cliente/service/configuracion-cliente.service'
+import { RecursoService } from '../../recurso/service/recurso.service'
+import { Recurso, TipoRecurso } from '../../recurso/entity/recurso.entity'
 
 export interface ToolContexto {
   conversacionId: string
@@ -8,9 +12,17 @@ export interface ToolContexto {
   agenteId: string
 }
 
+export interface ToolDocumento {
+  url: string
+  filename: string
+}
+
 export interface ToolResult {
   texto: string
   imagenes?: string[]
+  documentos?: ToolDocumento[]
+  audios?: string[]
+  videos?: string[]
 }
 
 @Injectable()
@@ -20,6 +32,8 @@ export class ToolExecutorService {
   constructor(
     private readonly conversacionService: ConversacionService,
     private readonly productoService: ProductoService,
+    private readonly confClienteService: ConfiguracionClienteService,
+    private readonly recursoService: RecursoService,
   ) {}
 
   async ejecutar(nombre: string, input: Record<string, any>, contexto: ToolContexto): Promise<ToolResult> {
@@ -32,6 +46,8 @@ export class ToolExecutorService {
         case 'escalar_agente':   return await this.escalarAgente(input, contexto)
         case 'crear_nota':       return await this.crearNota(input, contexto)
         case 'buscar_producto':  return await this.buscarProducto(input, contexto)
+        case 'enviar_catalogo':  return await this.enviarCatalogo(input, contexto)
+        case 'enviar_recurso':   return await this.enviarRecurso(input, contexto)
         default:
           this.logger.warn(`[Tool] Herramienta desconocida: ${nombre}`)
           return { texto: `Herramienta "${nombre}" no está implementada.` }
@@ -80,5 +96,89 @@ export class ToolExecutorService {
     }
 
     return { texto, imagenes }
+  }
+
+  /**
+   * Envía el catálogo PDF del cliente. La URL se guarda completa (absoluta) en
+   * `configuracion_cliente.CATALOGO_PDF_URL`, así no depende de APP_URL y el
+   * archivo puede estar hospedado en cualquier lugar público.
+   */
+  private async enviarCatalogo(_input: any, ctx: ToolContexto): Promise<ToolResult> {
+    const urlCfg = await this.confClienteService.obtenerPorClave(ctx.clienteId, 'CATALOGO_PDF_URL')
+    const url = urlCfg?.valor?.trim()
+
+    if (!url) {
+      this.logger.warn(`[Tool] enviar_catalogo: cliente ${ctx.clienteId} no tiene CATALOGO_PDF_URL configurado`)
+      return {
+        texto: '[Sistema: NO hay catálogo PDF configurado y no se envió ningún archivo. Dilo con honestidad, nunca afirmes haberlo enviado. Ofrece mostrar opciones del catálogo o derivar a un asesor.]',
+      }
+    }
+
+    const nombreCfg = await this.confClienteService.obtenerPorClave(ctx.clienteId, 'CATALOGO_PDF_NOMBRE')
+    const filename = nombreCfg?.valor?.trim() || 'catalogo.pdf'
+
+    return {
+      texto: '[Sistema: el catálogo PDF fue adjuntado y enviado al cliente. Coméntalo con naturalidad en una línea y sigue la conversación.]',
+      documentos: [{ url, filename }],
+    }
+  }
+
+  /**
+   * Busca en la tabla `recurso` (catálogos, fichas, fotos, audios, videos subidos desde
+   * la vista Recursos) y envía el que coincida. Si hay más de un match, no se envía nada
+   * automáticamente para no arriesgar mandar el archivo equivocado.
+   */
+  private async enviarRecurso(input: any, ctx: ToolContexto): Promise<ToolResult> {
+    const termino = String(input?.termino || '').trim()
+    if (!termino) {
+      return { texto: '[Sistema: falta el término de búsqueda para enviar_recurso. No se envió nada.]' }
+    }
+
+    const encontrados = await this.recursoService.buscarPorKeywords(ctx.clienteId, termino)
+    // Un recurso con agenteId asignado solo lo puede enviar ESE agente; sin agenteId es compartido.
+    const visibles = encontrados.filter(r => !r.agenteId || r.agenteId === ctx.agenteId)
+
+    if (visibles.length === 0) {
+      this.logger.warn(`[Tool] enviar_recurso: sin resultados para "${termino}" (cliente ${ctx.clienteId})`)
+      return {
+        texto: `[Sistema: no se encontró ningún recurso para "${termino}". No hay archivo, no afirmes haberlo enviado. Pregunta al cliente qué necesita o intenta con otro término.]`,
+      }
+    }
+
+    if (visibles.length > 1) {
+      const nombres = visibles.slice(0, 5).map(r => `${r.nombre} (${r.tipo.toLowerCase()})`).join(', ')
+      return {
+        texto: `[Sistema: hay ${visibles.length} recursos que coinciden con "${termino}": ${nombres}. No se envió ninguno para evitar confusión. Pide al cliente que precise cuál necesita, o vuelve a llamar la herramienta con un término más específico.]`,
+      }
+    }
+
+    const recurso = visibles[0]
+    const url = await this.recursoService.obtenerUrlPublica(recurso.id, ctx.clienteId)
+    const confirmacion = `[Sistema: se adjuntó "${recurso.nombre}" (${recurso.tipo.toLowerCase()}) al chat del cliente. Coméntalo con naturalidad en una línea y sigue la conversación.]`
+
+    switch (recurso.tipo) {
+      case TipoRecurso.PDF:
+        return { texto: confirmacion, documentos: [{ url, filename: this.nombreArchivo(recurso) }] }
+      case TipoRecurso.IMAGEN:
+        return { texto: confirmacion, imagenes: [url] }
+      case TipoRecurso.AUDIO:
+        return { texto: confirmacion, audios: [url] }
+      case TipoRecurso.VIDEO:
+        return { texto: confirmacion, videos: [url] }
+      default:
+        return { texto: `[Sistema: el recurso "${recurso.nombre}" tiene un tipo no soportado para envío automático.]` }
+    }
+  }
+
+  /** Nombre legible para el cliente en WhatsApp: nombre del recurso + extensión real del archivo. */
+  private nombreArchivo(recurso: Recurso): string {
+    let ext = ''
+    if (recurso.archivoLocal) {
+      ext = extname(recurso.archivoLocal)
+    } else if (recurso.urlExterna) {
+      try { ext = extname(new URL(recurso.urlExterna).pathname) } catch { /* URL inválida, sin extensión */ }
+    }
+    const base = recurso.nombre.replace(/[\\/:*?"<>|]/g, '').trim() || 'archivo'
+    return ext ? `${base}${ext}` : base
   }
 }

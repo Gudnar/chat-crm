@@ -22,15 +22,18 @@ const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const axios_1 = __importDefault(require("axios"));
 const agente_entity_1 = require("../entity/agente.entity");
+const herramienta_entity_1 = require("../../herramienta/entity/herramienta.entity");
+const herramienta_defaults_1 = require("../../herramienta/herramienta.defaults");
 const base_service_1 = require("../../../common/base/base-service");
 const constants_1 = require("../../../common/constants");
 const response_messages_1 = require("../../../common/constants/response-messages");
 const configuracion_cliente_service_1 = require("../../cliente/service/configuracion-cliente.service");
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 let AgenteService = AgenteService_1 = class AgenteService extends base_service_1.BaseService {
-    constructor(agenteRepository, configuracionClienteService) {
+    constructor(agenteRepository, herramientaRepository, configuracionClienteService) {
         super(AgenteService_1.name);
         this.agenteRepository = agenteRepository;
+        this.herramientaRepository = herramientaRepository;
         this.configuracionClienteService = configuracionClienteService;
     }
     async listar(clienteId) {
@@ -54,7 +57,24 @@ let AgenteService = AgenteService_1 = class AgenteService extends base_service_1
             usuarioCreacion,
             activo: true,
         });
-        return this.agenteRepository.save(agente);
+        const guardado = await this.agenteRepository.save(agente);
+        try {
+            await this.sembrarHerramientasPorDefecto(guardado.id, usuarioCreacion);
+        }
+        catch (err) {
+            this.logger.error(`No se pudieron sembrar las herramientas del agente ${guardado.id}: ${err.message}`);
+        }
+        return guardado;
+    }
+    async sembrarHerramientasPorDefecto(agenteId, usuarioCreacion) {
+        const filas = herramienta_defaults_1.HERRAMIENTAS_DEFAULT.map(d => this.herramientaRepository.create({
+            ...d,
+            agenteId,
+            estado: constants_1.Status.ACTIVE,
+            transaccion: constants_1.Transacccion.CREAR,
+            usuarioCreacion,
+        }));
+        await this.herramientaRepository.save(filas);
     }
     async actualizar(id, dto, usuarioModificacion, clienteId) {
         const agente = await this.obtener(id, clienteId);
@@ -103,7 +123,9 @@ let AgenteService = AgenteService_1 = class AgenteService extends base_service_1
 AgenteService = AgenteService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(agente_entity_1.Agente)),
+    __param(1, (0, typeorm_1.InjectRepository)(herramienta_entity_1.Herramienta)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
+        typeorm_2.Repository,
         configuracion_cliente_service_1.ConfiguracionClienteService])
 ], AgenteService);
 exports.AgenteService = AgenteService;

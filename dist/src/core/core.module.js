@@ -26,6 +26,7 @@ const producto_module_1 = require("./producto/producto.module");
 const soporte_module_1 = require("./soporte/soporte.module");
 const agente_humano_module_1 = require("./agente-humano/agente-humano.module");
 const oportunidad_module_1 = require("./oportunidad/oportunidad.module");
+const recurso_module_1 = require("./recurso/recurso.module");
 let CoreModule = class CoreModule {
 };
 CoreModule = __decorate([
@@ -63,6 +64,7 @@ CoreModule = __decorate([
             soporte_module_1.SoporteModule,
             agente_humano_module_1.AgenteHumanoModule,
             oportunidad_module_1.OportunidadModule,
+            recurso_module_1.RecursoModule,
         ],
     })
 ], CoreModule);

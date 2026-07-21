@@ -17,6 +17,7 @@ import { ProductoModule } from './producto/producto.module'
 import { SoporteModule } from './soporte/soporte.module'
 import { AgenteHumanoModule } from './agente-humano/agente-humano.module'
 import { OportunidadModule } from './oportunidad/oportunidad.module'
+import { RecursoModule } from './recurso/recurso.module'
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { OportunidadModule } from './oportunidad/oportunidad.module'
     SoporteModule,
     AgenteHumanoModule,
     OportunidadModule,
+    RecursoModule,
   ],
 })
 export class CoreModule {}

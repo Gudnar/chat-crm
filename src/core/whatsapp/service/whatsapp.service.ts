@@ -105,6 +105,61 @@ export class WhatsappService {
     }
   }
 
+  /**
+   * Envía un documento (PDF, etc.). Meta descarga el archivo desde `documentUrl`,
+   * por lo que debe ser una URL pública HTTPS sin autenticación (máx. 100 MB).
+   * `filename` es el nombre que ve el cliente en WhatsApp.
+   */
+  async enviarDocumento(to: string, documentUrl: string, filename: string, caption: string, config: WaConfig): Promise<void> {
+    try {
+      await this.apiPost(config.phoneNumberId, config.accessToken, {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: to.replace(/\D/g, ''),
+        type: 'document',
+        document: {
+          link: documentUrl,
+          ...(filename ? { filename } : {}),
+          ...(caption ? { caption } : {}),
+        },
+      })
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err.message
+      this.logger.warn(`[WA] No se pudo enviar documento (${documentUrl}): ${msg}`)
+    }
+  }
+
+  /** Meta no admite `caption` para audio. */
+  async enviarAudio(to: string, audioUrl: string, config: WaConfig): Promise<void> {
+    try {
+      await this.apiPost(config.phoneNumberId, config.accessToken, {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: to.replace(/\D/g, ''),
+        type: 'audio',
+        audio: { link: audioUrl },
+      })
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err.message
+      this.logger.warn(`[WA] No se pudo enviar audio (${audioUrl}): ${msg}`)
+    }
+  }
+
+  async enviarVideo(to: string, videoUrl: string, caption: string, config: WaConfig): Promise<void> {
+    try {
+      await this.apiPost(config.phoneNumberId, config.accessToken, {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: to.replace(/\D/g, ''),
+        type: 'video',
+        video: { link: videoUrl, ...(caption ? { caption } : {}) },
+      })
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err.message
+      this.logger.warn(`[WA] No se pudo enviar video (${videoUrl}): ${msg}`)
+    }
+  }
+
   async marcarLeido(messageId: string, config: WaConfig): Promise<void> {
     try {
       await this.apiPost(config.phoneNumberId, config.accessToken, {

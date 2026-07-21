@@ -20,4 +20,5 @@ export declare class WhatsappWebhookService {
     private extraerTexto;
     private encontrarOCrearConversacion;
     private llamarClaude;
+    private sanitizarRespuesta;
 }

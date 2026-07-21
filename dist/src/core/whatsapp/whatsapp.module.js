@@ -19,6 +19,7 @@ const tool_executor_service_1 = require("../herramienta/service/tool-executor.se
 const base_conocimiento_module_1 = require("../base-conocimiento/base-conocimiento.module");
 const producto_module_1 = require("../producto/producto.module");
 const red_social_module_1 = require("../red-social/red-social.module");
+const recurso_module_1 = require("../recurso/recurso.module");
 let WhatsappModule = class WhatsappModule {
 };
 WhatsappModule = __decorate([
@@ -30,6 +31,7 @@ WhatsappModule = __decorate([
             herramienta_module_1.HerramientaModule,
             base_conocimiento_module_1.BaseConocimientoModule,
             producto_module_1.ProductoModule,
+            recurso_module_1.RecursoModule,
             (0, common_1.forwardRef)(() => red_social_module_1.RedSocialModule),
         ],
         controllers: [whatsapp_controller_1.WhatsappController],

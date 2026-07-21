@@ -12,12 +12,18 @@ var ToolExecutorService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ToolExecutorService = void 0;
 const common_1 = require("@nestjs/common");
+const path_1 = require("path");
 const conversacion_service_1 = require("../../conversacion/service/conversacion.service");
 const producto_service_1 = require("../../producto/service/producto.service");
+const configuracion_cliente_service_1 = require("../../cliente/service/configuracion-cliente.service");
+const recurso_service_1 = require("../../recurso/service/recurso.service");
+const recurso_entity_1 = require("../../recurso/entity/recurso.entity");
 let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
-    constructor(conversacionService, productoService) {
+    constructor(conversacionService, productoService, confClienteService, recursoService) {
         this.conversacionService = conversacionService;
         this.productoService = productoService;
+        this.confClienteService = confClienteService;
+        this.recursoService = recursoService;
         this.logger = new common_1.Logger(ToolExecutorService_1.name);
     }
     async ejecutar(nombre, input, contexto) {
@@ -29,6 +35,8 @@ let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
                 case 'escalar_agente': return await this.escalarAgente(input, contexto);
                 case 'crear_nota': return await this.crearNota(input, contexto);
                 case 'buscar_producto': return await this.buscarProducto(input, contexto);
+                case 'enviar_catalogo': return await this.enviarCatalogo(input, contexto);
+                case 'enviar_recurso': return await this.enviarRecurso(input, contexto);
                 default:
                     this.logger.warn(`[Tool] Herramienta desconocida: ${nombre}`);
                     return { texto: `Herramienta "${nombre}" no está implementada.` };
@@ -69,11 +77,78 @@ let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
         }
         return { texto, imagenes };
     }
+    async enviarCatalogo(_input, ctx) {
+        const urlCfg = await this.confClienteService.obtenerPorClave(ctx.clienteId, 'CATALOGO_PDF_URL');
+        const url = urlCfg?.valor?.trim();
+        if (!url) {
+            this.logger.warn(`[Tool] enviar_catalogo: cliente ${ctx.clienteId} no tiene CATALOGO_PDF_URL configurado`);
+            return {
+                texto: '[Sistema: NO hay catálogo PDF configurado y no se envió ningún archivo. Dilo con honestidad, nunca afirmes haberlo enviado. Ofrece mostrar opciones del catálogo o derivar a un asesor.]',
+            };
+        }
+        const nombreCfg = await this.confClienteService.obtenerPorClave(ctx.clienteId, 'CATALOGO_PDF_NOMBRE');
+        const filename = nombreCfg?.valor?.trim() || 'catalogo.pdf';
+        return {
+            texto: '[Sistema: el catálogo PDF fue adjuntado y enviado al cliente. Coméntalo con naturalidad en una línea y sigue la conversación.]',
+            documentos: [{ url, filename }],
+        };
+    }
+    async enviarRecurso(input, ctx) {
+        const termino = String(input?.termino || '').trim();
+        if (!termino) {
+            return { texto: '[Sistema: falta el término de búsqueda para enviar_recurso. No se envió nada.]' };
+        }
+        const encontrados = await this.recursoService.buscarPorKeywords(ctx.clienteId, termino);
+        const visibles = encontrados.filter(r => !r.agenteId || r.agenteId === ctx.agenteId);
+        if (visibles.length === 0) {
+            this.logger.warn(`[Tool] enviar_recurso: sin resultados para "${termino}" (cliente ${ctx.clienteId})`);
+            return {
+                texto: `[Sistema: no se encontró ningún recurso para "${termino}". No hay archivo, no afirmes haberlo enviado. Pregunta al cliente qué necesita o intenta con otro término.]`,
+            };
+        }
+        if (visibles.length > 1) {
+            const nombres = visibles.slice(0, 5).map(r => `${r.nombre} (${r.tipo.toLowerCase()})`).join(', ');
+            return {
+                texto: `[Sistema: hay ${visibles.length} recursos que coinciden con "${termino}": ${nombres}. No se envió ninguno para evitar confusión. Pide al cliente que precise cuál necesita, o vuelve a llamar la herramienta con un término más específico.]`,
+            };
+        }
+        const recurso = visibles[0];
+        const url = await this.recursoService.obtenerUrlPublica(recurso.id, ctx.clienteId);
+        const confirmacion = `[Sistema: se adjuntó "${recurso.nombre}" (${recurso.tipo.toLowerCase()}) al chat del cliente. Coméntalo con naturalidad en una línea y sigue la conversación.]`;
+        switch (recurso.tipo) {
+            case recurso_entity_1.TipoRecurso.PDF:
+                return { texto: confirmacion, documentos: [{ url, filename: this.nombreArchivo(recurso) }] };
+            case recurso_entity_1.TipoRecurso.IMAGEN:
+                return { texto: confirmacion, imagenes: [url] };
+            case recurso_entity_1.TipoRecurso.AUDIO:
+                return { texto: confirmacion, audios: [url] };
+            case recurso_entity_1.TipoRecurso.VIDEO:
+                return { texto: confirmacion, videos: [url] };
+            default:
+                return { texto: `[Sistema: el recurso "${recurso.nombre}" tiene un tipo no soportado para envío automático.]` };
+        }
+    }
+    nombreArchivo(recurso) {
+        let ext = '';
+        if (recurso.archivoLocal) {
+            ext = (0, path_1.extname)(recurso.archivoLocal);
+        }
+        else if (recurso.urlExterna) {
+            try {
+                ext = (0, path_1.extname)(new URL(recurso.urlExterna).pathname);
+            }
+            catch { }
+        }
+        const base = recurso.nombre.replace(/[\\/:*?"<>|]/g, '').trim() || 'archivo';
+        return ext ? `${base}${ext}` : base;
+    }
 };
 ToolExecutorService = ToolExecutorService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [conversacion_service_1.ConversacionService,
-        producto_service_1.ProductoService])
+        producto_service_1.ProductoService,
+        configuracion_cliente_service_1.ConfiguracionClienteService,
+        recurso_service_1.RecursoService])
 ], ToolExecutorService);
 exports.ToolExecutorService = ToolExecutorService;
 //# sourceMappingURL=tool-executor.service.js.map

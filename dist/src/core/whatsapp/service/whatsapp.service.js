@@ -102,6 +102,55 @@ let WhatsappService = WhatsappService_1 = class WhatsappService {
             this.logger.warn(`[WA] No se pudo enviar imagen (${imageUrl}): ${msg}`);
         }
     }
+    async enviarDocumento(to, documentUrl, filename, caption, config) {
+        try {
+            await this.apiPost(config.phoneNumberId, config.accessToken, {
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: to.replace(/\D/g, ''),
+                type: 'document',
+                document: {
+                    link: documentUrl,
+                    ...(filename ? { filename } : {}),
+                    ...(caption ? { caption } : {}),
+                },
+            });
+        }
+        catch (err) {
+            const msg = err?.response?.data?.error?.message || err.message;
+            this.logger.warn(`[WA] No se pudo enviar documento (${documentUrl}): ${msg}`);
+        }
+    }
+    async enviarAudio(to, audioUrl, config) {
+        try {
+            await this.apiPost(config.phoneNumberId, config.accessToken, {
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: to.replace(/\D/g, ''),
+                type: 'audio',
+                audio: { link: audioUrl },
+            });
+        }
+        catch (err) {
+            const msg = err?.response?.data?.error?.message || err.message;
+            this.logger.warn(`[WA] No se pudo enviar audio (${audioUrl}): ${msg}`);
+        }
+    }
+    async enviarVideo(to, videoUrl, caption, config) {
+        try {
+            await this.apiPost(config.phoneNumberId, config.accessToken, {
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: to.replace(/\D/g, ''),
+                type: 'video',
+                video: { link: videoUrl, ...(caption ? { caption } : {}) },
+            });
+        }
+        catch (err) {
+            const msg = err?.response?.data?.error?.message || err.message;
+            this.logger.warn(`[WA] No se pudo enviar video (${videoUrl}): ${msg}`);
+        }
+    }
     async marcarLeido(messageId, config) {
         try {
             await this.apiPost(config.phoneNumberId, config.accessToken, {

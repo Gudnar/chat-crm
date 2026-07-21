@@ -6,6 +6,7 @@ import { CreateHerramientaDto, UpdateHerramientaDto } from '../dto/create-herram
 import { BaseService } from '../../../common/base/base-service'
 import { Status, Transacccion } from '../../../common/constants'
 import { Messages } from '../../../common/constants/response-messages'
+import { HERRAMIENTAS_DEFAULT } from '../herramienta.defaults'
 
 export interface ClaudeTool {
   name: string
@@ -64,60 +65,7 @@ export class HerramientaService extends BaseService {
   }
 
   async crearHerramientasPorDefecto(agenteId: string, usuarioCreacion: string): Promise<void> {
-    const defaults: Partial<Herramienta>[] = [
-      {
-        nombre: 'calificar_lead',
-        label: 'Calificar Lead',
-        descripcion: 'Actualiza el Lead Score (0-100) según el contenido de la conversación.',
-        parametros: [
-          { nombre: 'score', tipo: 'integer', descripcion: 'Valor del score entre 0 y 100', requerido: true, minimo: 0, maximo: 100 },
-          { nombre: 'razon', tipo: 'string', descripcion: 'Justificación del score asignado', requerido: true },
-        ] as any,
-        activa: true, autoConfirmar: true, confianzaMinima: 70, color: '#f59e0b', icono: 'qualify',
-        ejemplo: 'calificar_lead({ score: 82, razon: "Mencionó presupuesto disponible" })',
-      },
-      {
-        nombre: 'cambiar_estado',
-        label: 'Cambiar Estado',
-        descripcion: 'Cambia el estado de la conversación.',
-        parametros: [
-          { nombre: 'estado', tipo: 'enum', descripcion: 'Nuevo estado de la conversación', requerido: true, opciones: ['nuevo', 'abierto', 'pendiente', 'resuelto', 'cerrado'] },
-        ] as any,
-        activa: true, autoConfirmar: true, confianzaMinima: 80, color: '#6366f1', icono: 'check',
-      },
-      {
-        nombre: 'escalar_agente',
-        label: 'Escalar a Humano',
-        descripcion: 'Transfiere la conversación a un agente humano con contexto completo.',
-        parametros: [
-          { nombre: 'razon', tipo: 'string', descripcion: 'Motivo por el que se escala la conversación', requerido: true },
-          { nombre: 'prioridad', tipo: 'enum', descripcion: 'Nivel de urgencia', requerido: true, opciones: ['alta', 'media', 'baja'] },
-        ] as any,
-        activa: true, autoConfirmar: true, confianzaMinima: 60, color: '#ef4444', icono: 'user',
-      },
-      {
-        nombre: 'crear_nota',
-        label: 'Crear Nota Interna',
-        descripcion: 'Agrega una nota interna visible solo para el equipo.',
-        parametros: [
-          { nombre: 'nota', tipo: 'string', descripcion: 'Contenido de la nota interna', requerido: true },
-        ] as any,
-        activa: true, autoConfirmar: true, confianzaMinima: 50, color: '#64748b', icono: 'edit',
-      },
-      {
-        nombre: 'buscar_producto',
-        label: 'Buscar Producto',
-        descripcion: 'Busca productos en el catálogo según lo que pide el cliente. Úsala cuando pregunten por productos, precios, disponibilidad, marca o modelo.',
-        parametros: [
-          { nombre: 'termino', tipo: 'string', descripcion: 'Término de búsqueda: nombre, marca, modelo o categoría del producto', requerido: true },
-          { nombre: 'categoria', tipo: 'string', descripcion: 'Filtrar por categoría específica (opcional)', requerido: false },
-        ] as any,
-        activa: true, autoConfirmar: true, confianzaMinima: 50, color: '#10b981', icono: 'search',
-        ejemplo: 'buscar_producto({ termino: "zapatillas Nike", categoria: "calzado" })',
-      },
-    ]
-
-    for (const d of defaults) {
+    for (const d of HERRAMIENTAS_DEFAULT) {
       await this.crear({ agenteId, ...d } as CreateHerramientaDto, usuarioCreacion)
     }
   }

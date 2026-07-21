@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import axios from 'axios'
 import { Agente } from '../entity/agente.entity'
+import { Herramienta } from '../../herramienta/entity/herramienta.entity'
+import { HERRAMIENTAS_DEFAULT } from '../../herramienta/herramienta.defaults'
 import { CreateAgenteDto, UpdateAgenteDto } from '../dto/create-agente.dto'
 import { BaseService } from '../../../common/base/base-service'
 import { Status, Transacccion } from '../../../common/constants'
@@ -16,6 +18,8 @@ export class AgenteService extends BaseService {
   constructor(
     @InjectRepository(Agente)
     private readonly agenteRepository: Repository<Agente>,
+    @InjectRepository(Herramienta)
+    private readonly herramientaRepository: Repository<Herramienta>,
     private readonly configuracionClienteService: ConfiguracionClienteService,
   ) {
     super(AgenteService.name)
@@ -43,7 +47,33 @@ export class AgenteService extends BaseService {
       usuarioCreacion,
       activo: true,
     })
-    return this.agenteRepository.save(agente)
+    const guardado = await this.agenteRepository.save(agente)
+
+    // Auto-sembrar las herramientas estándar. Sin esto, el system prompt referencia
+    // tools (buscar_producto, escalar_agente, …) que la API nunca recibe y el modelo
+    // termina escribiéndolas como texto al cliente. Un fallo aquí no debe impedir
+    // la creación del agente, por eso va en try/catch.
+    try {
+      await this.sembrarHerramientasPorDefecto(guardado.id, usuarioCreacion)
+    } catch (err: any) {
+      this.logger.error(`No se pudieron sembrar las herramientas del agente ${guardado.id}: ${err.message}`)
+    }
+
+    return guardado
+  }
+
+  /** Inserta las 5 herramientas estándar para un agente recién creado. */
+  private async sembrarHerramientasPorDefecto(agenteId: string, usuarioCreacion: string): Promise<void> {
+    const filas: Herramienta[] = HERRAMIENTAS_DEFAULT.map(d =>
+      this.herramientaRepository.create({
+        ...d,
+        agenteId,
+        estado: Status.ACTIVE,
+        transaccion: Transacccion.CREAR,
+        usuarioCreacion,
+      }) as Herramienta,
+    )
+    await this.herramientaRepository.save(filas)
   }
 
   async actualizar(id: string, dto: UpdateAgenteDto, usuarioModificacion: string, clienteId: string): Promise<Agente> {

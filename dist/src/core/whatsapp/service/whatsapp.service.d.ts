@@ -16,6 +16,9 @@ export declare class WhatsappService {
     private apiPost;
     enviarTexto(to: string, text: string, config: WaConfig): Promise<any>;
     enviarImagen(to: string, imageUrl: string, caption: string, config: WaConfig): Promise<void>;
+    enviarDocumento(to: string, documentUrl: string, filename: string, caption: string, config: WaConfig): Promise<void>;
+    enviarAudio(to: string, audioUrl: string, config: WaConfig): Promise<void>;
+    enviarVideo(to: string, videoUrl: string, caption: string, config: WaConfig): Promise<void>;
     marcarLeido(messageId: string, config: WaConfig): Promise<void>;
     mostrarTyping(messageId: string, config: WaConfig): Promise<void>;
     testConexion(accessToken: string, phoneNumberId: string): Promise<{

@@ -74,7 +74,7 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
             const historial = (convActualizada.mensajes || [])
                 .slice(-MAX_HISTORY_MESSAGES)
                 .map(m => ({ role: m.role, content: m.content }));
-            const { respuesta, imagenes } = await this.llamarClaude(agente, historial, clienteId, conversacion.id);
+            const { respuesta, imagenes, documentos, audios, videos } = await this.llamarClaude(agente, historial, clienteId, conversacion.id);
             if (!respuesta)
                 return;
             await this.conversacionService.agregarMensaje(conversacion.id, { role: 'assistant', content: respuesta });
@@ -83,7 +83,16 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
             for (const imageUrl of imagenes) {
                 await this.waService.enviarImagen(from, imageUrl, '', config);
             }
-            this.logger.log(`[WA] Respuesta enviada a ${from} (${imagenes.length} imágenes adjuntas)`);
+            for (const doc of documentos) {
+                await this.waService.enviarDocumento(from, doc.url, doc.filename, '', config);
+            }
+            for (const audioUrl of audios) {
+                await this.waService.enviarAudio(from, audioUrl, config);
+            }
+            for (const videoUrl of videos) {
+                await this.waService.enviarVideo(from, videoUrl, '', config);
+            }
+            this.logger.log(`[WA] Respuesta enviada a ${from} (${imagenes.length} imágenes, ${documentos.length} documentos, ${audios.length} audios, ${videos.length} videos)`);
         }
         catch (err) {
             this.logger.error(`[WA] Error procesando mensaje de ${from}: ${err.message}`);
@@ -124,7 +133,7 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
         const apiKey = apiKeyConfig?.valor;
         if (!apiKey || apiKey.includes('•')) {
             this.logger.error('[WA] ANTHROPIC_API_KEY no configurada para este cliente');
-            return { respuesta: null, imagenes: [] };
+            return { respuesta: null, imagenes: [], documentos: [], audios: [], videos: [] };
         }
         const instrucciones = agente.systemPrompt ||
             `Eres ${agente.nombre}, un asistente IA ${agente.tono || 'profesional'}. Responde en ${agente.idioma || 'español'} de forma concisa y útil.`;
@@ -139,6 +148,9 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
         };
         const messages = mensajes.map(m => ({ role: m.role, content: m.content }));
         const pendingImages = [];
+        const pendingDocs = [];
+        const pendingAudios = [];
+        const pendingVideos = [];
         try {
             const maxTokens = tools.length > 0
                 ? Math.max(Number(agente.maxTokens) || 0, 700)
@@ -171,7 +183,7 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
                         }
                         continue;
                     }
-                    return { respuesta: textBlock?.text ?? null, imagenes: pendingImages };
+                    return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos };
                 }
                 if (stop_reason === 'tool_use') {
                     messages.push({ role: 'assistant', content });
@@ -184,21 +196,50 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
                         if (resultado.imagenes?.length) {
                             pendingImages.push(...resultado.imagenes);
                         }
+                        if (resultado.documentos?.length) {
+                            pendingDocs.push(...resultado.documentos);
+                        }
+                        if (resultado.audios?.length) {
+                            pendingAudios.push(...resultado.audios);
+                        }
+                        if (resultado.videos?.length) {
+                            pendingVideos.push(...resultado.videos);
+                        }
                         toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultado.texto });
                     }
                     messages.push({ role: 'user', content: toolResults });
                     continue;
                 }
                 const textBlock = content?.find((b) => b.type === 'text');
-                return { respuesta: textBlock?.text ?? null, imagenes: pendingImages };
+                return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos };
             }
             this.logger.warn('[WA] Se alcanzó el límite de iteraciones de tool_use');
-            return { respuesta: null, imagenes: [] };
+            return { respuesta: null, imagenes: [], documentos: [], audios: [], videos: [] };
         }
         catch (err) {
             this.logger.error(`[WA] Error llamando a Claude: ${err?.response?.data?.error?.message || err.message}`);
-            return { respuesta: null, imagenes: [] };
+            return { respuesta: null, imagenes: [], documentos: [], audios: [], videos: [] };
         }
+    }
+    sanitizarRespuesta(texto, tools) {
+        if (!texto)
+            return texto;
+        let limpio = texto;
+        limpio = limpio.replace(/\[\s*Sistema:[^\]]*\]/gi, '');
+        const nombres = tools
+            .map(t => t.name)
+            .filter(Boolean)
+            .map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        if (nombres.length) {
+            const re = new RegExp(`\`?\\b(?:${nombres.join('|')})\\s*\\([^)]*\\)\`?`, 'g');
+            const antes = limpio;
+            limpio = limpio.replace(re, '');
+            if (limpio !== antes) {
+                this.logger.warn('[WA] Se filtró una fuga de sintaxis de herramienta en la respuesta al cliente');
+            }
+        }
+        limpio = limpio.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+        return limpio || null;
     }
 };
 WhatsappWebhookService = WhatsappWebhookService_1 = __decorate([

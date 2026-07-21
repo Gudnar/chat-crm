@@ -10,6 +10,7 @@ import { ToolExecutorService } from '../herramienta/service/tool-executor.servic
 import { BaseConocimientoModule } from '../base-conocimiento/base-conocimiento.module'
 import { ProductoModule } from '../producto/producto.module'
 import { RedSocialModule } from '../red-social/red-social.module'
+import { RecursoModule } from '../recurso/recurso.module'
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { RedSocialModule } from '../red-social/red-social.module'
     HerramientaModule,
     BaseConocimientoModule,
     ProductoModule,
+    RecursoModule,
     forwardRef(() => RedSocialModule),
   ],
   controllers: [WhatsappController],
