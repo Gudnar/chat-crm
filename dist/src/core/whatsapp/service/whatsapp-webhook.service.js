@@ -74,12 +74,18 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
             const historial = (convActualizada.mensajes || [])
                 .slice(-MAX_HISTORY_MESSAGES)
                 .map(m => ({ role: m.role, content: m.content }));
-            const { respuesta, imagenes, documentos, audios, videos } = await this.llamarClaude(agente, historial, clienteId, conversacion.id);
-            if (!respuesta)
+            const { respuesta, textosPrevios, imagenes, documentos, audios, videos } = await this.llamarClaude(agente, historial, clienteId, conversacion.id);
+            if (!respuesta && textosPrevios.length === 0)
                 return;
-            await this.conversacionService.agregarMensaje(conversacion.id, { role: 'assistant', content: respuesta });
+            for (const texto of textosPrevios) {
+                await this.conversacionService.agregarMensaje(conversacion.id, { role: 'assistant', content: texto });
+                await this.waService.enviarTexto(from, texto, config);
+            }
+            if (respuesta) {
+                await this.conversacionService.agregarMensaje(conversacion.id, { role: 'assistant', content: respuesta });
+                await this.waService.enviarTexto(from, respuesta, config);
+            }
             await this.agenteService.incrementarContadores(agente.id, 1);
-            await this.waService.enviarTexto(from, respuesta, config);
             for (const imageUrl of imagenes) {
                 await this.waService.enviarImagen(from, imageUrl, '', config);
             }
@@ -133,12 +139,17 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
         const apiKey = apiKeyConfig?.valor;
         if (!apiKey || apiKey.includes('•')) {
             this.logger.error('[WA] ANTHROPIC_API_KEY no configurada para este cliente');
-            return { respuesta: null, imagenes: [], documentos: [], audios: [], videos: [] };
+            return { respuesta: null, textosPrevios: [], imagenes: [], documentos: [], audios: [], videos: [] };
         }
         const instrucciones = agente.systemPrompt ||
             `Eres ${agente.nombre}, un asistente IA ${agente.tono || 'profesional'}. Responde en ${agente.idioma || 'español'} de forma concisa y útil.`;
+        const fechaActual = `[Fecha y hora actual: ${new Date().toLocaleString('es-BO', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
+        })}]`;
         const faqContexto = await this.baseConocimientoService.construirContexto(agente.id);
-        const systemPrompt = faqContexto ? `${instrucciones}\n\n${faqContexto}` : instrucciones;
+        const systemPrompt = faqContexto ? `${fechaActual}\n\n${instrucciones}\n\n${faqContexto}` : `${fechaActual}\n\n${instrucciones}`;
+        const cacheDisabledConfig = await this.confClienteService.obtenerPorClave(clienteId, 'ANTHROPIC_CACHE_DISABLED');
+        const cacheDisabled = cacheDisabledConfig?.valor?.toLowerCase() === 'true';
         const herramientas = await this.herramientaService.listarPorAgente(agente.id);
         const tools = this.herramientaService.convertirAFormatoClaudeTools(herramientas);
         const headers = {
@@ -151,15 +162,21 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
         const pendingDocs = [];
         const pendingAudios = [];
         const pendingVideos = [];
+        const textosPrevios = [];
+        const herramientasEjecutadas = new Set();
+        let reintentoConfirmacionForzado = false;
         try {
             const maxTokens = tools.length > 0
                 ? Math.max(Number(agente.maxTokens) || 0, 700)
                 : (Number(agente.maxTokens) || 256);
             for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
+                const systemBlock = cacheDisabled
+                    ? { type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }
+                    : { type: 'text', text: systemPrompt };
                 const body = {
                     model: agente.modelo || 'claude-haiku-4-5',
                     max_tokens: maxTokens,
-                    system: systemPrompt,
+                    system: [systemBlock],
                     messages,
                 };
                 if (tools.length > 0)
@@ -183,14 +200,38 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
                         }
                         continue;
                     }
-                    return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos };
+                    const pareceConfirmarCita = /anotad[oa]/i.test(textBlock?.text ?? '');
+                    const tieneAgendarCita = tools.some(t => t.name === 'agendar_cita');
+                    if (pareceConfirmarCita && tieneAgendarCita && !herramientasEjecutadas.has('agendar_cita') && !reintentoConfirmacionForzado) {
+                        reintentoConfirmacionForzado = true;
+                        this.logger.warn('[WA] Texto de confirmación de cita sin ejecutar agendar_cita — forzando reintento');
+                        const nudge = {
+                            type: 'text',
+                            text: '[Sistema: escribiste una confirmación de cita ("Anotado...") pero NO ejecutaste agendar_cita en este turno. Ejecuta la herramienta agendar_cita AHORA con la fecha/hora que el cliente dio, y luego redacta tu respuesta.]',
+                        };
+                        messages.push({ role: 'assistant', content });
+                        messages.push({ role: 'user', content: [nudge] });
+                        continue;
+                    }
+                    if (pareceConfirmarCita && tieneAgendarCita && !herramientasEjecutadas.has('agendar_cita')) {
+                        this.logger.error(`[WA] POSIBLE CITA FANTASMA: el agente ${agente.id} confirmó una cita en texto sin ejecutar agendar_cita (conversación ${conversacionId})`);
+                    }
+                    return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos };
                 }
                 if (stop_reason === 'tool_use') {
                     messages.push({ role: 'assistant', content });
+                    for (const block of content) {
+                        if (block.type === 'text' && block.text?.trim()) {
+                            const limpio = this.sanitizarRespuesta(block.text, tools);
+                            if (limpio)
+                                textosPrevios.push(limpio);
+                        }
+                    }
                     const toolResults = [];
                     for (const block of content) {
                         if (block.type !== 'tool_use')
                             continue;
+                        herramientasEjecutadas.add(block.name);
                         this.logger.log(`[WA] Tool use: ${block.name} input=${JSON.stringify(block.input)}`);
                         const resultado = await this.toolExecutor.ejecutar(block.name, block.input, { conversacionId, clienteId, agenteId: agente.id });
                         if (resultado.imagenes?.length) {
@@ -211,14 +252,14 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
                     continue;
                 }
                 const textBlock = content?.find((b) => b.type === 'text');
-                return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos };
+                return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos };
             }
             this.logger.warn('[WA] Se alcanzó el límite de iteraciones de tool_use');
-            return { respuesta: null, imagenes: [], documentos: [], audios: [], videos: [] };
+            return { respuesta: null, textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos };
         }
         catch (err) {
             this.logger.error(`[WA] Error llamando a Claude: ${err?.response?.data?.error?.message || err.message}`);
-            return { respuesta: null, imagenes: [], documentos: [], audios: [], videos: [] };
+            return { respuesta: null, textosPrevios, imagenes: [], documentos: [], audios: [], videos: [] };
         }
     }
     sanitizarRespuesta(texto, tools) {

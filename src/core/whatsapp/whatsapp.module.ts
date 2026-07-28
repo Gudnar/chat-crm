@@ -11,6 +11,7 @@ import { BaseConocimientoModule } from '../base-conocimiento/base-conocimiento.m
 import { ProductoModule } from '../producto/producto.module'
 import { RedSocialModule } from '../red-social/red-social.module'
 import { RecursoModule } from '../recurso/recurso.module'
+import { ReservacionModule } from '../reservacion/reservacion.module'
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { RecursoModule } from '../recurso/recurso.module'
     BaseConocimientoModule,
     ProductoModule,
     RecursoModule,
+    ReservacionModule,
     forwardRef(() => RedSocialModule),
   ],
   controllers: [WhatsappController],

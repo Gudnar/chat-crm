@@ -1,0 +1,32 @@
+import { Repository } from 'typeorm';
+import { Reserva } from '../entity/reserva.entity';
+import { CreateReservaDto, UpdateReservaDto, ActualizarEstadoReservaDto } from '../dto/reserva.dto';
+import { ServicioAgenteService } from './servicio-agente.service';
+import { HorarioAgenteService } from './horario-agente.service';
+import { AgenteService } from '../../agente/service/agente.service';
+import { BaseService } from '../../../common/base/base-service';
+export interface FiltrosReserva {
+    agenteId?: string;
+    estado?: string;
+    desde?: string;
+    hasta?: string;
+}
+export declare class ReservacionService extends BaseService {
+    private readonly reservaRepository;
+    private readonly servicioAgenteService;
+    private readonly horarioAgenteService;
+    private readonly agenteService;
+    constructor(reservaRepository: Repository<Reserva>, servicioAgenteService: ServicioAgenteService, horarioAgenteService: HorarioAgenteService, agenteService: AgenteService);
+    listar(clienteId: string, filtros?: FiltrosReserva): Promise<Reserva[]>;
+    obtener(id: string, clienteId: string): Promise<Reserva>;
+    crear(dto: CreateReservaDto, usuarioCreacion: string, clienteId: string): Promise<Reserva>;
+    actualizar(id: string, dto: UpdateReservaDto, usuarioModificacion: string, clienteId: string): Promise<Reserva>;
+    actualizarEstado(id: string, dto: ActualizarEstadoReservaDto, usuarioModificacion: string, clienteId: string): Promise<Reserva>;
+    obtenerDisponibilidad(agenteId: string, clienteId: string, fecha: string, duracionMinutos: number): Promise<string[]>;
+    private aFechaLocal;
+    private aFechaYHoraLocal;
+    private validarDentroDeHorario;
+    private validarSinSolapamiento;
+    private seSolapan;
+    private generarCodigoReserva;
+}

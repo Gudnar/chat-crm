@@ -18,6 +18,7 @@ import { SoporteModule } from './soporte/soporte.module'
 import { AgenteHumanoModule } from './agente-humano/agente-humano.module'
 import { OportunidadModule } from './oportunidad/oportunidad.module'
 import { RecursoModule } from './recurso/recurso.module'
+import { ReservacionModule } from './reservacion/reservacion.module'
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { RecursoModule } from './recurso/recurso.module'
     AgenteHumanoModule,
     OportunidadModule,
     RecursoModule,
+    ReservacionModule,
   ],
 })
 export class CoreModule {}

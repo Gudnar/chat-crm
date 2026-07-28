@@ -70,6 +70,32 @@ export const HERRAMIENTAS_DEFAULT: Partial<Herramienta>[] = [
     ejemplo: 'enviar_catalogo({})',
   },
   {
+    nombre: 'consultar_disponibilidad',
+    label: 'Consultar Disponibilidad',
+    descripcion: 'Consulta los horarios reales disponibles de un agente humano en una fecha específica. Úsala ANTES de agendar_cita cuando el cliente pregunte por horarios/disponibilidad, o para confirmar que un horario existe antes de reservarlo. Nunca inventes horarios sin haberla llamado primero.',
+    parametros: [
+      { nombre: 'agente_id', tipo: 'string', descripcion: 'ID del agente humano a consultar', requerido: true },
+      { nombre: 'fecha', tipo: 'string', descripcion: 'Fecha en formato YYYY-MM-DD', requerido: true },
+      { nombre: 'duracion_minutos', tipo: 'integer', descripcion: 'Duración de la cita en minutos (por defecto 30)', requerido: false },
+    ] as any,
+    activa: true, autoConfirmar: true, confianzaMinima: 60, color: '#0ea5e9', icono: 'clock',
+    ejemplo: 'consultar_disponibilidad({ agente_id: "12", fecha: "2026-07-29", duracion_minutos: 30 })',
+  },
+  {
+    nombre: 'agendar_cita',
+    label: 'Agendar Cita',
+    descripcion: 'Crea una reserva/cita. Úsala cuando el cliente acepte agendar una llamada o consulta. Si no indicas agente_id, la cita queda con este mismo agente (seguimiento); si el cliente quiere hablar con una persona, pasa el agente_id del agente humano correspondiente.',
+    parametros: [
+      { nombre: 'fecha_hora', tipo: 'string', descripcion: 'Fecha y hora en formato ISO 8601 o "YYYY-MM-DD HH:mm" (hora local)', requerido: true },
+      { nombre: 'titulo', tipo: 'string', descripcion: 'Título breve de la cita (ej. "Consulta técnica", "Demo de producto")', requerido: true },
+      { nombre: 'agente_id', tipo: 'string', descripcion: 'ID del agente humano con quien agendar. Si se omite, se agenda con este mismo agente (seguimiento)', requerido: false },
+      { nombre: 'duracion_minutos', tipo: 'integer', descripcion: 'Duración en minutos (por defecto 30)', requerido: false },
+      { nombre: 'notas', tipo: 'string', descripcion: 'Notas de contexto para quien atienda la cita', requerido: false },
+    ] as any,
+    activa: true, autoConfirmar: true, confianzaMinima: 70, color: '#22c55e', icono: 'calendar',
+    ejemplo: 'agendar_cita({ fecha_hora: "2026-07-28 14:30", titulo: "Consulta técnica", notas: "Cliente reporta error en integración" })',
+  },
+  {
     nombre: 'enviar_recurso',
     label: 'Enviar Recurso Multimedia',
     descripcion: 'Busca y envía un recurso (catálogo, ficha técnica, foto, audio o video) subido en la sección Recursos, por nombre, categoría o tema. Úsala cuando el cliente pida un archivo específico que no sea el catálogo general completo.',

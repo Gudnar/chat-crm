@@ -18,6 +18,7 @@ export declare class Conversacion extends AuditoriaEntity {
     totalMensajes: number;
     escalado: boolean;
     etiquetas: string[];
+    recursosEnviados: string[];
     motivoScore?: string;
     ultimaCalificacion?: Date;
     notas?: string;

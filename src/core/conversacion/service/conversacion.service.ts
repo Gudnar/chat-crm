@@ -67,6 +67,19 @@ export class ConversacionService extends BaseService {
     return this.conversacionRepository.save(conv)
   }
 
+  async yaSeEnvioRecurso(id: string, recursoId: string): Promise<boolean> {
+    const conv = await this.obtener(id)
+    return (conv.recursosEnviados || []).includes(recursoId)
+  }
+
+  async marcarRecursoEnviado(id: string, recursoId: string): Promise<void> {
+    const conv = await this.obtener(id)
+    if ((conv.recursosEnviados || []).includes(recursoId)) return
+    conv.recursosEnviados = [...(conv.recursosEnviados || []), recursoId]
+    conv.transaccion = Transacccion.ACTUALIZAR
+    await this.conversacionRepository.save(conv)
+  }
+
   async actualizarScore(id: string, score: number): Promise<void> {
     await this.conversacionRepository.update(id, { score })
   }

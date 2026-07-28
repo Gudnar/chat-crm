@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.OrigenOportunidad = exports.ESTADOS_OPORTUNIDAD_FINALES = exports.EstadoOportunidad = exports.EstadoConversacion = exports.ModoAgente = exports.TipoActividadAgente = exports.DisponibilidadAgente = exports.TipoAgente = exports.Roles = exports.Configurations = exports.USUARIO_NORMAL = exports.USUARIO_SISTEMA = exports.Transacccion = exports.Status = exports.SWAGGER_API_ROOT = exports.SWAGGER_API_CURRENT_VERSION = exports.SWAGGER_API_DESCRIPTION = exports.SWAGGER_API_NAME = void 0;
+exports.EstadoReserva = exports.OrigenOportunidad = exports.ESTADOS_OPORTUNIDAD_FINALES = exports.EstadoOportunidad = exports.EstadoConversacion = exports.ModoAgente = exports.TipoActividadAgente = exports.DisponibilidadAgente = exports.TipoAgente = exports.Roles = exports.Configurations = exports.USUARIO_NORMAL = exports.USUARIO_SISTEMA = exports.Transacccion = exports.Status = exports.SWAGGER_API_ROOT = exports.SWAGGER_API_CURRENT_VERSION = exports.SWAGGER_API_DESCRIPTION = exports.SWAGGER_API_NAME = void 0;
 exports.SWAGGER_API_NAME = 'IDE-IA API';
 exports.SWAGGER_API_DESCRIPTION = 'API REST para la plataforma de gestión de Agentes IA con Anthropic Claude';
 exports.SWAGGER_API_CURRENT_VERSION = '1.0.0';
@@ -83,5 +83,11 @@ exports.OrigenOportunidad = {
     REFERENCIA: 'referencia',
     WEB: 'web',
     OTRO: 'otro',
+};
+exports.EstadoReserva = {
+    CONFIRMADA: 'confirmada',
+    CANCELADA: 'cancelada',
+    COMPLETADA: 'completada',
+    NO_ASISTIO: 'no_asistio',
 };
 //# sourceMappingURL=index.js.map

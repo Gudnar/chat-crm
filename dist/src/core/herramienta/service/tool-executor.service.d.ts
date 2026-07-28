@@ -2,6 +2,7 @@ import { ConversacionService } from '../../conversacion/service/conversacion.ser
 import { ProductoService } from '../../producto/service/producto.service';
 import { ConfiguracionClienteService } from '../../cliente/service/configuracion-cliente.service';
 import { RecursoService } from '../../recurso/service/recurso.service';
+import { ReservacionService } from '../../reservacion/service/reservacion.service';
 export interface ToolContexto {
     conversacionId: string;
     clienteId: string;
@@ -23,14 +24,17 @@ export declare class ToolExecutorService {
     private readonly productoService;
     private readonly confClienteService;
     private readonly recursoService;
+    private readonly reservacionService;
     private readonly logger;
-    constructor(conversacionService: ConversacionService, productoService: ProductoService, confClienteService: ConfiguracionClienteService, recursoService: RecursoService);
+    constructor(conversacionService: ConversacionService, productoService: ProductoService, confClienteService: ConfiguracionClienteService, recursoService: RecursoService, reservacionService: ReservacionService);
     ejecutar(nombre: string, input: Record<string, any>, contexto: ToolContexto): Promise<ToolResult>;
     private calificarLead;
     private cambiarEstado;
     private escalarAgente;
     private crearNota;
     private buscarProducto;
+    private consultarDisponibilidad;
+    private agendarCita;
     private enviarCatalogo;
     private enviarRecurso;
     private nombreArchivo;

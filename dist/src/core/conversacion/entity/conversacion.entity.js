@@ -74,6 +74,10 @@ __decorate([
     __metadata("design:type", Array)
 ], Conversacion.prototype, "etiquetas", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: 'recursos_enviados', type: 'jsonb', default: '[]' }),
+    __metadata("design:type", Array)
+], Conversacion.prototype, "recursosEnviados", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: 'motivo_score', type: 'text', nullable: true }),
     __metadata("design:type", String)
 ], Conversacion.prototype, "motivoScore", void 0);

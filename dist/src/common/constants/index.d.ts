@@ -77,3 +77,9 @@ export declare const OrigenOportunidad: {
     WEB: string;
     OTRO: string;
 };
+export declare const EstadoReserva: {
+    CONFIRMADA: string;
+    CANCELADA: string;
+    COMPLETADA: string;
+    NO_ASISTIO: string;
+};

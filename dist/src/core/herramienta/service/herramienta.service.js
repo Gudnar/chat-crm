@@ -70,7 +70,7 @@ let HerramientaService = HerramientaService_1 = class HerramientaService extends
             .filter(h => h.activa)
             .map(h => ({
             name: h.nombre,
-            description: h.descripcion,
+            description: h.ejemplo ? `${h.descripcion}\n\nEjemplo: ${h.ejemplo}` : h.descripcion,
             input_schema: this.construirInputSchema(h.parametros),
         }));
     }

@@ -46,6 +46,12 @@ export class Conversacion extends AuditoriaEntity {
   @Column({ name: 'etiquetas', type: 'jsonb', default: '[]' })
   etiquetas: string[]
 
+  // IDs de `recurso` ya enviados en esta conversación — el modelo puede "olvidar" que ya
+  // ejecutó enviar_recurso (sobre todo si no acompañó la tool con texto) y volver a
+  // llamarla; esto lo bloquea a nivel de código en vez de confiar solo en el prompt.
+  @Column({ name: 'recursos_enviados', type: 'jsonb', default: '[]' })
+  recursosEnviados: string[]
+
   @Column({ name: 'motivo_score', type: 'text', nullable: true })
   motivoScore?: string
 

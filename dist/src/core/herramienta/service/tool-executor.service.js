@@ -18,12 +18,15 @@ const producto_service_1 = require("../../producto/service/producto.service");
 const configuracion_cliente_service_1 = require("../../cliente/service/configuracion-cliente.service");
 const recurso_service_1 = require("../../recurso/service/recurso.service");
 const recurso_entity_1 = require("../../recurso/entity/recurso.entity");
+const reservacion_service_1 = require("../../reservacion/service/reservacion.service");
+const constants_1 = require("../../../common/constants");
 let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
-    constructor(conversacionService, productoService, confClienteService, recursoService) {
+    constructor(conversacionService, productoService, confClienteService, recursoService, reservacionService) {
         this.conversacionService = conversacionService;
         this.productoService = productoService;
         this.confClienteService = confClienteService;
         this.recursoService = recursoService;
+        this.reservacionService = reservacionService;
         this.logger = new common_1.Logger(ToolExecutorService_1.name);
     }
     async ejecutar(nombre, input, contexto) {
@@ -37,6 +40,8 @@ let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
                 case 'buscar_producto': return await this.buscarProducto(input, contexto);
                 case 'enviar_catalogo': return await this.enviarCatalogo(input, contexto);
                 case 'enviar_recurso': return await this.enviarRecurso(input, contexto);
+                case 'agendar_cita': return await this.agendarCita(input, contexto);
+                case 'consultar_disponibilidad': return await this.consultarDisponibilidad(input, contexto);
                 default:
                     this.logger.warn(`[Tool] Herramienta desconocida: ${nombre}`);
                     return { texto: `Herramienta "${nombre}" no está implementada.` };
@@ -77,6 +82,56 @@ let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
         }
         return { texto, imagenes };
     }
+    async consultarDisponibilidad(input, ctx) {
+        const agenteId = String(input?.agente_id || '').trim();
+        const fecha = String(input?.fecha || '').trim();
+        const duracion = Number(input?.duracion_minutos) || 30;
+        if (!agenteId || !fecha) {
+            return { texto: '[Sistema: faltan agente_id o fecha para consultar disponibilidad. No se consultó nada.]' };
+        }
+        try {
+            const slots = await this.reservacionService.obtenerDisponibilidad(agenteId, ctx.clienteId, fecha, duracion);
+            if (!slots.length) {
+                return { texto: `[Sistema: no hay horarios disponibles el ${fecha}. Sugiere al cliente otra fecha, no inventes horarios.]` };
+            }
+            return { texto: `[Sistema: horarios REALMENTE disponibles el ${fecha}: ${slots.join(', ')}. Ofrece solo estas opciones al cliente, nunca inventes otras.]` };
+        }
+        catch (err) {
+            this.logger.warn(`[Tool] consultar_disponibilidad falló: ${err.message}`);
+            return { texto: `[Sistema: no se pudo consultar disponibilidad (${err.message}).]` };
+        }
+    }
+    async agendarCita(input, ctx) {
+        const agenteObjetivoId = input?.agente_id ? String(input.agente_id) : ctx.agenteId;
+        const fechaHora = String(input?.fecha_hora || '').trim().replace(' ', 'T');
+        const titulo = String(input?.titulo || '').trim();
+        if (!fechaHora || !titulo) {
+            return { texto: '[Sistema: faltan fecha_hora o titulo para agendar la cita. No se creó ninguna reserva.]' };
+        }
+        try {
+            const conversacion = await this.conversacionService.obtener(ctx.conversacionId);
+            const reserva = await this.reservacionService.crear({
+                agenteId: agenteObjetivoId,
+                conversacionId: ctx.conversacionId,
+                contactoNombre: conversacion?.contacto || 'Cliente WhatsApp',
+                contactoTelefono: conversacion?.contacto,
+                fechaInicio: fechaHora,
+                duracionMinutos: Number(input?.duracion_minutos) || undefined,
+                titulo,
+                descripcion: input?.notas,
+            }, constants_1.USUARIO_SISTEMA, ctx.clienteId);
+            const fechaLegible = new Date(reserva.fechaInicio).toLocaleString('es-BO', { dateStyle: 'medium', timeStyle: 'short' });
+            return {
+                texto: `[Sistema: cita agendada con éxito, código ${reserva.codigoReserva}, para el ${fechaLegible}. Confírmaselo al cliente con naturalidad en una línea.]`,
+            };
+        }
+        catch (err) {
+            this.logger.warn(`[Tool] agendar_cita falló: ${err.message}`);
+            return {
+                texto: `[Sistema: no se pudo agendar la cita (${err.message}). Informa al cliente con honestidad y, si es un problema de horario, ofrece otra fecha/hora.]`,
+            };
+        }
+    }
     async enviarCatalogo(_input, ctx) {
         const urlCfg = await this.confClienteService.obtenerPorClave(ctx.clienteId, 'CATALOGO_PDF_URL');
         const url = urlCfg?.valor?.trim();
@@ -95,37 +150,64 @@ let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
     }
     async enviarRecurso(input, ctx) {
         const termino = String(input?.termino || '').trim();
+        this.logger.log(`[enviarRecurso] START: termino="${termino}", clienteId=${ctx.clienteId}, agenteId=${ctx.agenteId}`);
         if (!termino) {
             return { texto: '[Sistema: falta el término de búsqueda para enviar_recurso. No se envió nada.]' };
         }
-        const encontrados = await this.recursoService.buscarPorKeywords(ctx.clienteId, termino);
-        const visibles = encontrados.filter(r => !r.agenteId || r.agenteId === ctx.agenteId);
-        if (visibles.length === 0) {
-            this.logger.warn(`[Tool] enviar_recurso: sin resultados para "${termino}" (cliente ${ctx.clienteId})`);
-            return {
-                texto: `[Sistema: no se encontró ningún recurso para "${termino}". No hay archivo, no afirmes haberlo enviado. Pregunta al cliente qué necesita o intenta con otro término.]`,
-            };
+        try {
+            this.logger.log(`[enviarRecurso] recursoService exists: ${!!this.recursoService}`);
+            const encontrados = await this.recursoService.buscarPorKeywords(ctx.clienteId, termino);
+            this.logger.log(`[enviarRecurso] buscarPorKeywords devolvió ${encontrados.length} resultado(s)`);
+            const visibles = encontrados.filter(r => !r.agenteId || r.agenteId === ctx.agenteId);
+            this.logger.log(`[enviarRecurso] después de filtrar por agente: ${visibles.length} visible(s)`);
+            if (visibles.length === 0) {
+                this.logger.warn(`[Tool] enviar_recurso: sin resultados para "${termino}" (cliente ${ctx.clienteId})`);
+                return {
+                    texto: `[Sistema: no se encontró ningún recurso para "${termino}". No hay archivo, no afirmes haberlo enviado. Pregunta al cliente qué necesita o intenta con otro término.]`,
+                };
+            }
+            if (visibles.length > 1) {
+                const nombres = visibles.slice(0, 5).map(r => `${r.nombre} (${r.tipo.toLowerCase()})`).join(', ');
+                this.logger.log(`[enviarRecurso] múltiples resultados, no se envía nada automáticamente`);
+                return {
+                    texto: `[Sistema: hay ${visibles.length} recursos que coinciden con "${termino}": ${nombres}. No se envió ninguno para evitar confusión. Pide al cliente que precise cuál necesita, o vuelve a llamar la herramienta con un término más específico.]`,
+                };
+            }
+            const recurso = visibles[0];
+            this.logger.log(`[enviarRecurso] recurso encontrado: id=${recurso.id}, nombre="${recurso.nombre}", tipo=${recurso.tipo}, archivoLocal="${recurso.archivoLocal}"`);
+            if (await this.conversacionService.yaSeEnvioRecurso(ctx.conversacionId, recurso.id)) {
+                this.logger.log(`[enviarRecurso] "${recurso.nombre}" ya se había enviado antes en esta conversación — no se reenvía`);
+                return {
+                    texto: `[Sistema: "${recurso.nombre}" ya se envió antes en esta conversación. NO se volvió a adjuntar. Coméntalo con naturalidad (ej. "ya te lo había enviado arriba") sin decir que lo mandaste de nuevo.]`,
+                };
+            }
+            const url = await this.recursoService.obtenerUrlPublica(recurso.id, ctx.clienteId);
+            this.logger.log(`[enviarRecurso] obtenerUrlPublica devolvió: ${url}`);
+            const filename = this.nombreArchivo(recurso);
+            this.logger.log(`[enviarRecurso] nombreArchivo: ${filename}`);
+            const confirmacion = `[Sistema: se adjuntó "${recurso.nombre}" (${recurso.tipo.toLowerCase()}) al chat del cliente. Coméntalo con naturalidad en una línea y sigue la conversación.]`;
+            await this.conversacionService.marcarRecursoEnviado(ctx.conversacionId, recurso.id);
+            switch (recurso.tipo) {
+                case recurso_entity_1.TipoRecurso.PDF:
+                    this.logger.log(`[enviarRecurso] enviando como PDF: ${url}`);
+                    return { texto: confirmacion, documentos: [{ url, filename }] };
+                case recurso_entity_1.TipoRecurso.IMAGEN:
+                    this.logger.log(`[enviarRecurso] enviando como IMAGEN: ${url}`);
+                    return { texto: confirmacion, imagenes: [url] };
+                case recurso_entity_1.TipoRecurso.AUDIO:
+                    this.logger.log(`[enviarRecurso] enviando como AUDIO: ${url}`);
+                    return { texto: confirmacion, audios: [url] };
+                case recurso_entity_1.TipoRecurso.VIDEO:
+                    this.logger.log(`[enviarRecurso] enviando como VIDEO: ${url}`);
+                    return { texto: confirmacion, videos: [url] };
+                default:
+                    this.logger.warn(`[enviarRecurso] tipo no soportado: ${recurso.tipo}`);
+                    return { texto: `[Sistema: el recurso "${recurso.nombre}" tiene un tipo no soportado para envío automático.]` };
+            }
         }
-        if (visibles.length > 1) {
-            const nombres = visibles.slice(0, 5).map(r => `${r.nombre} (${r.tipo.toLowerCase()})`).join(', ');
-            return {
-                texto: `[Sistema: hay ${visibles.length} recursos que coinciden con "${termino}": ${nombres}. No se envió ninguno para evitar confusión. Pide al cliente que precise cuál necesita, o vuelve a llamar la herramienta con un término más específico.]`,
-            };
-        }
-        const recurso = visibles[0];
-        const url = await this.recursoService.obtenerUrlPublica(recurso.id, ctx.clienteId);
-        const confirmacion = `[Sistema: se adjuntó "${recurso.nombre}" (${recurso.tipo.toLowerCase()}) al chat del cliente. Coméntalo con naturalidad en una línea y sigue la conversación.]`;
-        switch (recurso.tipo) {
-            case recurso_entity_1.TipoRecurso.PDF:
-                return { texto: confirmacion, documentos: [{ url, filename: this.nombreArchivo(recurso) }] };
-            case recurso_entity_1.TipoRecurso.IMAGEN:
-                return { texto: confirmacion, imagenes: [url] };
-            case recurso_entity_1.TipoRecurso.AUDIO:
-                return { texto: confirmacion, audios: [url] };
-            case recurso_entity_1.TipoRecurso.VIDEO:
-                return { texto: confirmacion, videos: [url] };
-            default:
-                return { texto: `[Sistema: el recurso "${recurso.nombre}" tiene un tipo no soportado para envío automático.]` };
+        catch (err) {
+            this.logger.error(`[enviarRecurso] ERROR: ${err.message}`, err.stack);
+            return { texto: `[Sistema: error interno al buscar recurso: ${err.message}]` };
         }
     }
     nombreArchivo(recurso) {
@@ -148,7 +230,8 @@ ToolExecutorService = ToolExecutorService_1 = __decorate([
     __metadata("design:paramtypes", [conversacion_service_1.ConversacionService,
         producto_service_1.ProductoService,
         configuracion_cliente_service_1.ConfiguracionClienteService,
-        recurso_service_1.RecursoService])
+        recurso_service_1.RecursoService,
+        reservacion_service_1.ReservacionService])
 ], ToolExecutorService);
 exports.ToolExecutorService = ToolExecutorService;
 //# sourceMappingURL=tool-executor.service.js.map

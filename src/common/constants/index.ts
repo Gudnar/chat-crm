@@ -94,3 +94,10 @@ export const OrigenOportunidad = {
   WEB: 'web',
   OTRO: 'otro',
 }
+
+export const EstadoReserva = {
+  CONFIRMADA: 'confirmada',
+  CANCELADA: 'cancelada',
+  COMPLETADA: 'completada',
+  NO_ASISTIO: 'no_asistio',
+}

@@ -5,6 +5,8 @@ import { ProductoService } from '../../producto/service/producto.service'
 import { ConfiguracionClienteService } from '../../cliente/service/configuracion-cliente.service'
 import { RecursoService } from '../../recurso/service/recurso.service'
 import { Recurso, TipoRecurso } from '../../recurso/entity/recurso.entity'
+import { ReservacionService } from '../../reservacion/service/reservacion.service'
+import { USUARIO_SISTEMA } from '../../../common/constants'
 
 export interface ToolContexto {
   conversacionId: string
@@ -34,6 +36,7 @@ export class ToolExecutorService {
     private readonly productoService: ProductoService,
     private readonly confClienteService: ConfiguracionClienteService,
     private readonly recursoService: RecursoService,
+    private readonly reservacionService: ReservacionService,
   ) {}
 
   async ejecutar(nombre: string, input: Record<string, any>, contexto: ToolContexto): Promise<ToolResult> {
@@ -48,6 +51,8 @@ export class ToolExecutorService {
         case 'buscar_producto':  return await this.buscarProducto(input, contexto)
         case 'enviar_catalogo':  return await this.enviarCatalogo(input, contexto)
         case 'enviar_recurso':   return await this.enviarRecurso(input, contexto)
+        case 'agendar_cita':     return await this.agendarCita(input, contexto)
+        case 'consultar_disponibilidad': return await this.consultarDisponibilidad(input, contexto)
         default:
           this.logger.warn(`[Tool] Herramienta desconocida: ${nombre}`)
           return { texto: `Herramienta "${nombre}" no está implementada.` }
@@ -96,6 +101,70 @@ export class ToolExecutorService {
     }
 
     return { texto, imagenes }
+  }
+
+  private async consultarDisponibilidad(input: any, ctx: ToolContexto): Promise<ToolResult> {
+    const agenteId = String(input?.agente_id || '').trim()
+    const fecha = String(input?.fecha || '').trim()
+    const duracion = Number(input?.duracion_minutos) || 30
+
+    if (!agenteId || !fecha) {
+      return { texto: '[Sistema: faltan agente_id o fecha para consultar disponibilidad. No se consultó nada.]' }
+    }
+
+    try {
+      const slots = await this.reservacionService.obtenerDisponibilidad(agenteId, ctx.clienteId, fecha, duracion)
+      if (!slots.length) {
+        return { texto: `[Sistema: no hay horarios disponibles el ${fecha}. Sugiere al cliente otra fecha, no inventes horarios.]` }
+      }
+      return { texto: `[Sistema: horarios REALMENTE disponibles el ${fecha}: ${slots.join(', ')}. Ofrece solo estas opciones al cliente, nunca inventes otras.]` }
+    } catch (err: any) {
+      this.logger.warn(`[Tool] consultar_disponibilidad falló: ${err.message}`)
+      return { texto: `[Sistema: no se pudo consultar disponibilidad (${err.message}).]` }
+    }
+  }
+
+  /**
+   * Crea una Reserva agnóstica al tipo de agente: sin `agente_id` queda consigo mismo
+   * (seguimiento); con `agente_id` de un agente humano, se valida horario y solapamiento
+   * en ReservacionService.crear (solo aplica esa validación estricta para tipo 'humano').
+   */
+  private async agendarCita(input: any, ctx: ToolContexto): Promise<ToolResult> {
+    const agenteObjetivoId = input?.agente_id ? String(input.agente_id) : ctx.agenteId
+    const fechaHora = String(input?.fecha_hora || '').trim().replace(' ', 'T')
+    const titulo = String(input?.titulo || '').trim()
+
+    if (!fechaHora || !titulo) {
+      return { texto: '[Sistema: faltan fecha_hora o titulo para agendar la cita. No se creó ninguna reserva.]' }
+    }
+
+    try {
+      const conversacion = await this.conversacionService.obtener(ctx.conversacionId)
+      const reserva = await this.reservacionService.crear(
+        {
+          agenteId: agenteObjetivoId,
+          conversacionId: ctx.conversacionId,
+          contactoNombre: conversacion?.contacto || 'Cliente WhatsApp',
+          contactoTelefono: conversacion?.contacto,
+          fechaInicio: fechaHora,
+          duracionMinutos: Number(input?.duracion_minutos) || undefined,
+          titulo,
+          descripcion: input?.notas,
+        },
+        USUARIO_SISTEMA,
+        ctx.clienteId,
+      )
+
+      const fechaLegible = new Date(reserva.fechaInicio).toLocaleString('es-BO', { dateStyle: 'medium', timeStyle: 'short' })
+      return {
+        texto: `[Sistema: cita agendada con éxito, código ${reserva.codigoReserva}, para el ${fechaLegible}. Confírmaselo al cliente con naturalidad en una línea.]`,
+      }
+    } catch (err: any) {
+      this.logger.warn(`[Tool] agendar_cita falló: ${err.message}`)
+      return {
+        texto: `[Sistema: no se pudo agendar la cita (${err.message}). Informa al cliente con honestidad y, si es un problema de horario, ofrece otra fecha/hora.]`,
+      }
+    }
   }
 
   /**
@@ -163,6 +232,16 @@ export class ToolExecutorService {
       const recurso = visibles[0]
       this.logger.log(`[enviarRecurso] recurso encontrado: id=${recurso.id}, nombre="${recurso.nombre}", tipo=${recurso.tipo}, archivoLocal="${recurso.archivoLocal}"`)
 
+      // Red de seguridad: el modelo puede "olvidar" que ya ejecutó esta tool para el mismo
+      // recurso (sobre todo si no acompañó la llamada con texto) y volver a invocarla más
+      // adelante en la misma conversación. Se bloquea el reenvío a nivel de código.
+      if (await this.conversacionService.yaSeEnvioRecurso(ctx.conversacionId, recurso.id)) {
+        this.logger.log(`[enviarRecurso] "${recurso.nombre}" ya se había enviado antes en esta conversación — no se reenvía`)
+        return {
+          texto: `[Sistema: "${recurso.nombre}" ya se envió antes en esta conversación. NO se volvió a adjuntar. Coméntalo con naturalidad (ej. "ya te lo había enviado arriba") sin decir que lo mandaste de nuevo.]`,
+        }
+      }
+
       const url = await this.recursoService.obtenerUrlPublica(recurso.id, ctx.clienteId)
       this.logger.log(`[enviarRecurso] obtenerUrlPublica devolvió: ${url}`)
 
@@ -170,6 +249,7 @@ export class ToolExecutorService {
       this.logger.log(`[enviarRecurso] nombreArchivo: ${filename}`)
 
       const confirmacion = `[Sistema: se adjuntó "${recurso.nombre}" (${recurso.tipo.toLowerCase()}) al chat del cliente. Coméntalo con naturalidad en una línea y sigue la conversación.]`
+      await this.conversacionService.marcarRecursoEnviado(ctx.conversacionId, recurso.id)
 
       switch (recurso.tipo) {
         case TipoRecurso.PDF:

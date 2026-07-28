@@ -77,7 +77,10 @@ export class HerramientaService extends BaseService {
       .filter(h => h.activa)
       .map(h => ({
         name: h.nombre,
-        description: h.descripcion,
+        // El campo `ejemplo` solo se guardaba como referencia para el admin en la UI y
+        // nunca llegaba a la API — un ejemplo de invocación real en la descripción mejora
+        // notablemente que el modelo la use en vez de solo redactar el resultado en texto.
+        description: h.ejemplo ? `${h.descripcion}\n\nEjemplo: ${h.ejemplo}` : h.descripcion,
         input_schema: this.construirInputSchema(h.parametros as any[]),
       }))
   }

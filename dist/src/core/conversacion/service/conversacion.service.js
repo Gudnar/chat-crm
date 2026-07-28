@@ -76,6 +76,18 @@ let ConversacionService = ConversacionService_1 = class ConversacionService exte
         conv.transaccion = constants_1.Transacccion.ACTUALIZAR;
         return this.conversacionRepository.save(conv);
     }
+    async yaSeEnvioRecurso(id, recursoId) {
+        const conv = await this.obtener(id);
+        return (conv.recursosEnviados || []).includes(recursoId);
+    }
+    async marcarRecursoEnviado(id, recursoId) {
+        const conv = await this.obtener(id);
+        if ((conv.recursosEnviados || []).includes(recursoId))
+            return;
+        conv.recursosEnviados = [...(conv.recursosEnviados || []), recursoId];
+        conv.transaccion = constants_1.Transacccion.ACTUALIZAR;
+        await this.conversacionRepository.save(conv);
+    }
     async actualizarScore(id, score) {
         await this.conversacionRepository.update(id, { score });
     }
