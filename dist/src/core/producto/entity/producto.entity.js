@@ -64,6 +64,10 @@ __decorate([
     __metadata("design:type", Number)
 ], Producto.prototype, "stock", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: 'fecha_disponibilidad', type: 'date', nullable: true }),
+    __metadata("design:type", Object)
+], Producto.prototype, "fechaDisponibilidad", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: 'imagenes', type: 'jsonb', default: '[]' }),
     __metadata("design:type", Array)
 ], Producto.prototype, "imagenes", void 0);

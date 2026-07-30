@@ -52,4 +52,8 @@ export class UsuarioService extends BaseService {
   async actualizarDatosBloqueo(id: string, codigo: string | null, fecha: any): Promise<void> {
     await this.usuarioRepository.update(id, { fechaBloqueo: fecha, intentos: 0 })
   }
+
+  async actualizarTema(id: string, tema: string): Promise<void> {
+    await this.usuarioRepository.update(id, { tema })
+  }
 }

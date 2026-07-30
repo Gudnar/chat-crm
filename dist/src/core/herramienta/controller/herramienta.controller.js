@@ -27,17 +27,17 @@ let HerramientaController = class HerramientaController {
         this.agenteService = agenteService;
     }
     async listar(agenteId, req) {
-        await this.agenteService.obtener(agenteId, req.user.clienteId);
+        await this.agenteService.obtener(agenteId, this.clienteIdDe(req));
         const datos = await this.herramientaService.listarPorAgente(agenteId);
         return new success_response_dto_1.SuccessResponseDto(datos);
     }
     async crear(dto, req) {
-        await this.agenteService.obtener(dto.agenteId, req.user.clienteId);
+        await this.agenteService.obtener(dto.agenteId, this.clienteIdDe(req));
         const datos = await this.herramientaService.crear(dto, req.user.id);
         return new success_response_dto_1.SuccessResponseDto(datos, response_messages_1.Messages.SUCCESS_CREATE);
     }
     async crearDefaults(agenteId, req) {
-        await this.agenteService.obtener(agenteId, req.user.clienteId);
+        await this.agenteService.obtener(agenteId, this.clienteIdDe(req));
         const existentes = await this.herramientaService.listarPorAgente(agenteId);
         if (existentes.length > 0) {
             return new success_response_dto_1.SuccessResponseDto(existentes, 'El agente ya tiene herramientas configuradas');
@@ -48,15 +48,24 @@ let HerramientaController = class HerramientaController {
     }
     async actualizar(id, dto, req) {
         const h = await this.herramientaService.obtener(id);
-        await this.agenteService.obtener(h.agenteId, req.user.clienteId);
+        await this.agenteService.obtener(h.agenteId, this.clienteIdDe(req));
         const datos = await this.herramientaService.actualizar(id, dto, req.user.id);
         return new success_response_dto_1.SuccessResponseDto(datos, response_messages_1.Messages.SUCCESS_UPDATE);
     }
     async eliminar(id, req) {
         const h = await this.herramientaService.obtener(id);
-        await this.agenteService.obtener(h.agenteId, req.user.clienteId);
+        await this.agenteService.obtener(h.agenteId, this.clienteIdDe(req));
         await this.herramientaService.eliminar(id, req.user.id);
         return new success_response_dto_1.SuccessResponseDto(null, response_messages_1.Messages.SUCCESS_DELETE);
+    }
+    clienteIdDe(req) {
+        const deSesion = req.user?.clienteId;
+        if (deSesion)
+            return String(deSesion);
+        const deQuery = req.query?.clienteId;
+        if (deQuery)
+            return String(deQuery);
+        throw new common_1.BadRequestException('Debes indicar el cliente a administrar (parámetro clienteId)');
     }
 };
 __decorate([

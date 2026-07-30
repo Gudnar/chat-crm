@@ -28,6 +28,7 @@ export declare class ProductoService extends BaseService {
     private borrarArchivo;
     buscar(clienteId: string, termino: string, categoria?: string): Promise<Producto[]>;
     formatearParaClaude(productos: Producto[]): string;
+    private describirDisponibilidad;
     exportarExcel(clienteId: string): Promise<Buffer>;
     private valorCelda;
     private parsearPrecio;

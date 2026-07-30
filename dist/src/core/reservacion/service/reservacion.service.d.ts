@@ -1,4 +1,5 @@
 import { Repository } from 'typeorm';
+import { Agente } from '../../agente/entity/agente.entity';
 import { Reserva } from '../entity/reserva.entity';
 import { CreateReservaDto, UpdateReservaDto, ActualizarEstadoReservaDto } from '../dto/reserva.dto';
 import { ServicioAgenteService } from './servicio-agente.service';
@@ -23,6 +24,17 @@ export declare class ReservacionService extends BaseService {
     actualizar(id: string, dto: UpdateReservaDto, usuarioModificacion: string, clienteId: string): Promise<Reserva>;
     actualizarEstado(id: string, dto: ActualizarEstadoReservaDto, usuarioModificacion: string, clienteId: string): Promise<Reserva>;
     obtenerDisponibilidad(agenteId: string, clienteId: string, fecha: string, duracionMinutos: number): Promise<string[]>;
+    private normalizarNombre;
+    buscarHumanoPorNombre(clienteId: string, nombreSolicitado: string): Promise<{
+        agente: Agente | null;
+        error?: string;
+    }>;
+    elegirHumanoDisponible(clienteId: string, fechaInicio: Date, fechaFin: Date): Promise<{
+        agente: Agente | null;
+        error?: string;
+    }>;
+    private estaLibreEnHorario;
+    obtenerDisponibilidadEquipo(clienteId: string, fecha: string, duracionMinutos: number): Promise<string[]>;
     private aFechaLocal;
     private aFechaYHoraLocal;
     private validarDentroDeHorario;

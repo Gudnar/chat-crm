@@ -13,6 +13,7 @@ export declare class Usuario extends AuditoriaEntity {
     clienteId: string | null;
     cliente: Cliente | null;
     rolClienteId: string | null;
+    tema: string;
     hashPassword(): Promise<void>;
     constructor(data?: Partial<Usuario>);
 }

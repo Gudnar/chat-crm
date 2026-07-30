@@ -48,6 +48,12 @@ let AgenteService = AgenteService_1 = class AgenteService extends base_service_1
             throw new common_1.NotFoundException(response_messages_1.Messages.AGENTE_NOT_FOUND);
         return agente;
     }
+    async listarHumanosActivos(clienteId) {
+        return this.agenteRepository.find({
+            where: { clienteId, tipoAgente: constants_1.TipoAgente.HUMANO, activo: true, estado: constants_1.Status.ACTIVE },
+            order: { nombre: 'ASC' },
+        });
+    }
     async crear(dto, usuarioCreacion, clienteId) {
         const agente = this.agenteRepository.create({
             ...dto,

@@ -11,4 +11,5 @@ export declare class HerramientaController {
     crearDefaults(agenteId: string, req: any): Promise<SuccessResponseDto>;
     actualizar(id: string, dto: UpdateHerramientaDto, req: any): Promise<SuccessResponseDto>;
     eliminar(id: string, req: any): Promise<SuccessResponseDto>;
+    private clienteIdDe;
 }

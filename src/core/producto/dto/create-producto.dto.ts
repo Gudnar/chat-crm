@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsInt, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString, Min } from 'class-validator'
+import { IsArray, IsBoolean, IsDateString, IsInt, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString, Min } from 'class-validator'
 import { ApiProperty } from '@nestjs/swagger'
 
 export class CreateProductoDto {
@@ -49,6 +49,11 @@ export class CreateProductoDto {
   @IsInt()
   @Min(0)
   stock?: number
+
+  @ApiProperty({ required: false, example: '2026-08-15', description: 'Fecha desde la que el producto está disponible para la venta. Vacío = disponible desde siempre.' })
+  @IsOptional()
+  @IsDateString()
+  fechaDisponibilidad?: string
 
   @ApiProperty({ required: false, example: ['https://ejemplo.com/imagen.jpg'] })
   @IsOptional()

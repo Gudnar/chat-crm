@@ -101,7 +101,7 @@ let WhatsappController = WhatsappController_1 = class WhatsappController {
         return 'EVENT_RECEIVED';
     }
     async obtenerConfig(req) {
-        const config = await this.waService.obtenerConfig(req.user.clienteId);
+        const config = await this.waService.obtenerConfig(this.clienteIdDe(req));
         return {
             ...config,
             accessToken: config.accessToken ? '••••••••••••••••' : '',
@@ -109,24 +109,33 @@ let WhatsappController = WhatsappController_1 = class WhatsappController {
         };
     }
     async guardarConfig(dto, req) {
-        await this.waService.guardarConfig(req.user.clienteId, dto, req.user.id);
+        await this.waService.guardarConfig(this.clienteIdDe(req), dto, req.user.id);
         return new success_response_dto_1.SuccessResponseDto(null, 'Configuración WhatsApp guardada correctamente');
     }
     async testConexion(dto, req) {
         let token = dto.accessToken;
         if (!token) {
-            const config = await this.waService.obtenerConfig(req.user.clienteId);
+            const config = await this.waService.obtenerConfig(this.clienteIdDe(req));
             token = config.accessToken;
         }
         return this.waService.testConexion(token, dto.phoneNumberId);
     }
     async obtenerEstado(req) {
-        return this.waService.obtenerEstadisticas(req.user.clienteId);
+        return this.waService.obtenerEstadisticas(this.clienteIdDe(req));
     }
     async enviarMensaje(dto, req) {
-        const config = await this.waService.obtenerConfig(req.user.clienteId);
+        const config = await this.waService.obtenerConfig(this.clienteIdDe(req));
         const result = await this.waService.enviarTexto(dto.celular, dto.mensaje, config);
         return new success_response_dto_1.SuccessResponseDto(result, 'Mensaje enviado');
+    }
+    clienteIdDe(req) {
+        const deSesion = req.user?.clienteId;
+        if (deSesion)
+            return String(deSesion);
+        const deQuery = req.query?.clienteId;
+        if (deQuery)
+            return String(deQuery);
+        throw new common_1.BadRequestException('Debes indicar el cliente a administrar (parámetro clienteId)');
     }
 };
 __decorate([

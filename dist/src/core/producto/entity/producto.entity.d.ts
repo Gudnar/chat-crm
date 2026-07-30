@@ -11,6 +11,7 @@ export declare class Producto extends AuditoriaEntity {
     precioOferta?: number;
     moneda: string;
     stock?: number;
+    fechaDisponibilidad?: string | null;
     imagenes: string[];
     detalles: Record<string, any>;
     activo: boolean;

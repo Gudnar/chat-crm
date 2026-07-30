@@ -11,6 +11,7 @@ export declare class AgenteService extends BaseService {
     constructor(agenteRepository: Repository<Agente>, herramientaRepository: Repository<Herramienta>, configuracionClienteService: ConfiguracionClienteService);
     listar(clienteId: string): Promise<Agente[]>;
     obtener(id: string, clienteId: string): Promise<Agente>;
+    listarHumanosActivos(clienteId: string): Promise<Agente[]>;
     crear(dto: CreateAgenteDto, usuarioCreacion: string, clienteId: string): Promise<Agente>;
     private sembrarHerramientasPorDefecto;
     actualizar(id: string, dto: UpdateAgenteDto, usuarioModificacion: string, clienteId: string): Promise<Agente>;

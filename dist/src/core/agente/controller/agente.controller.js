@@ -25,28 +25,37 @@ let AgenteController = class AgenteController {
         this.agenteService = agenteService;
     }
     async listar(req) {
-        const datos = await this.agenteService.listar(req.user.clienteId);
+        const datos = await this.agenteService.listar(this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos);
     }
     async obtener(id, req) {
-        const datos = await this.agenteService.obtener(id, req.user.clienteId);
+        const datos = await this.agenteService.obtener(id, this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos);
     }
     async crear(dto, req) {
-        const datos = await this.agenteService.crear(dto, req.user.id, req.user.clienteId);
+        const datos = await this.agenteService.crear(dto, req.user.id, this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos, response_messages_1.Messages.AGENTE_CREATED);
     }
     async actualizar(id, dto, req) {
-        const datos = await this.agenteService.actualizar(id, dto, req.user.id, req.user.clienteId);
+        const datos = await this.agenteService.actualizar(id, dto, req.user.id, this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos, response_messages_1.Messages.AGENTE_UPDATED);
     }
     async eliminar(id, req) {
-        await this.agenteService.eliminar(id, req.user.id, req.user.clienteId);
+        await this.agenteService.eliminar(id, req.user.id, this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(null, response_messages_1.Messages.SUCCESS_DELETE);
     }
     async testConAgente(id, mensaje, historial = [], req) {
-        const datos = await this.agenteService.testConAgente(id, mensaje, historial, req.user.clienteId);
+        const datos = await this.agenteService.testConAgente(id, mensaje, historial, this.clienteIdDe(req));
         return new success_response_dto_1.SuccessResponseDto(datos);
+    }
+    clienteIdDe(req) {
+        const deSesion = req.user?.clienteId;
+        if (deSesion)
+            return String(deSesion);
+        const deQuery = req.query?.clienteId;
+        if (deQuery)
+            return String(deQuery);
+        throw new common_1.BadRequestException('Debes indicar el cliente a administrar (parámetro clienteId)');
     }
 };
 __decorate([

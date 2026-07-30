@@ -18,11 +18,14 @@ const passport_1 = require("@nestjs/passport");
 const swagger_1 = require("@nestjs/swagger");
 const authentication_service_1 = require("../service/authentication.service");
 const login_dto_1 = require("../dto/login.dto");
+const actualizar_tema_dto_1 = require("../dto/actualizar-tema.dto");
 const jwt_auth_guard_1 = require("../guards/jwt-auth.guard");
 const success_response_dto_1 = require("../../../common/dto/success-response.dto");
+const usuario_service_1 = require("../../usuario/service/usuario.service");
 let AuthenticationController = class AuthenticationController {
-    constructor(authService) {
+    constructor(authService, usuarioService) {
         this.authService = authService;
+        this.usuarioService = usuarioService;
     }
     async login(req) {
         const result = await this.authService.autenticar(req.user);
@@ -30,6 +33,10 @@ let AuthenticationController = class AuthenticationController {
     }
     async perfil(req) {
         return new success_response_dto_1.SuccessResponseDto(req.user);
+    }
+    async actualizarTema(dto, req) {
+        await this.usuarioService.actualizarTema(req.user.id, dto.tema);
+        return new success_response_dto_1.SuccessResponseDto(null, 'Tema actualizado');
     }
     async logout(req) {
         await this.authService.cerrarSesion(req.user.id, req.user.roles ?? []);
@@ -55,6 +62,15 @@ __decorate([
 ], AuthenticationController.prototype, "perfil", null);
 __decorate([
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.Patch)('tema'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [actualizar_tema_dto_1.ActualizarTemaDto, Object]),
+    __metadata("design:returntype", Promise)
+], AuthenticationController.prototype, "actualizarTema", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Post)('logout'),
     __param(0, (0, common_1.Request)()),
     __metadata("design:type", Function),
@@ -64,7 +80,8 @@ __decorate([
 AuthenticationController = __decorate([
     (0, swagger_1.ApiTags)('Autenticación'),
     (0, common_1.Controller)('auth'),
-    __metadata("design:paramtypes", [authentication_service_1.AuthenticationService])
+    __metadata("design:paramtypes", [authentication_service_1.AuthenticationService,
+        usuario_service_1.UsuarioService])
 ], AuthenticationController);
 exports.AuthenticationController = AuthenticationController;
 //# sourceMappingURL=authentication.controller.js.map

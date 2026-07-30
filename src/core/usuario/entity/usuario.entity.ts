@@ -49,6 +49,9 @@ export class Usuario extends AuditoriaEntity {
   @Column({ name: 'rol_cliente_id', type: 'bigint', nullable: true })
   rolClienteId: string | null
 
+  @Column({ name: 'tema', length: 20, default: 'dark' })
+  tema: string
+
   @BeforeInsert()
   async hashPassword() {
     if (this.contrasena) {

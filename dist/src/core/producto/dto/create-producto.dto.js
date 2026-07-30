@@ -72,6 +72,12 @@ __decorate([
     __metadata("design:type", Number)
 ], CreateProductoDto.prototype, "stock", void 0);
 __decorate([
+    (0, swagger_1.ApiProperty)({ required: false, example: '2026-08-15', description: 'Fecha desde la que el producto está disponible para la venta. Vacío = disponible desde siempre.' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsDateString)(),
+    __metadata("design:type", String)
+], CreateProductoDto.prototype, "fechaDisponibilidad", void 0);
+__decorate([
     (0, swagger_1.ApiProperty)({ required: false, example: ['https://ejemplo.com/imagen.jpg'] }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsArray)(),

@@ -104,20 +104,36 @@ export class ToolExecutorService {
   }
 
   private async consultarDisponibilidad(input: any, ctx: ToolContexto): Promise<ToolResult> {
-    const agenteId = String(input?.agente_id || '').trim()
+    const nombreAgente = String(input?.agente || '').trim()
+    const agenteIdLegado = String(input?.agente_id || '').trim()
     const fecha = String(input?.fecha || '').trim()
     const duracion = Number(input?.duracion_minutos) || 30
 
-    if (!agenteId || !fecha) {
-      return { texto: '[Sistema: faltan agente_id o fecha para consultar disponibilidad. No se consultó nada.]' }
+    if (!fecha) {
+      return { texto: '[Sistema: falta la fecha para consultar disponibilidad. No se consultó nada.]' }
     }
 
     try {
-      const slots = await this.reservacionService.obtenerDisponibilidad(agenteId, ctx.clienteId, fecha, duracion)
-      if (!slots.length) {
-        return { texto: `[Sistema: no hay horarios disponibles el ${fecha}. Sugiere al cliente otra fecha, no inventes horarios.]` }
+      // Nombre de una persona específica del equipo (nunca ID)
+      if (nombreAgente) {
+        const { agente, error } = await this.reservacionService.buscarHumanoPorNombre(ctx.clienteId, nombreAgente)
+        if (error || !agente) return { texto: `[Sistema: ${error}]` }
+        const slots = await this.reservacionService.obtenerDisponibilidad(agente.id, ctx.clienteId, fecha, duracion)
+        if (!slots.length) return { texto: `[Sistema: ${agente.nombre} no tiene horarios disponibles el ${fecha}. Sugiere al cliente otra fecha, no inventes horarios.]` }
+        return { texto: `[Sistema: horarios REALMENTE disponibles de ${agente.nombre} el ${fecha}: ${slots.join(', ')}. Ofrece solo estas opciones, nunca inventes otras.]` }
       }
-      return { texto: `[Sistema: horarios REALMENTE disponibles el ${fecha}: ${slots.join(', ')}. Ofrece solo estas opciones al cliente, nunca inventes otras.]` }
+
+      // Compatibilidad con prompts antiguos que ya pasan un ID explícito
+      if (agenteIdLegado) {
+        const slots = await this.reservacionService.obtenerDisponibilidad(agenteIdLegado, ctx.clienteId, fecha, duracion)
+        if (!slots.length) return { texto: `[Sistema: no hay horarios disponibles el ${fecha}. Sugiere al cliente otra fecha, no inventes horarios.]` }
+        return { texto: `[Sistema: horarios REALMENTE disponibles el ${fecha}: ${slots.join(', ')}. Ofrece solo estas opciones al cliente, nunca inventes otras.]` }
+      }
+
+      // Sin nombre: disponibilidad combinada de todo el equipo humano
+      const slots = await this.reservacionService.obtenerDisponibilidadEquipo(ctx.clienteId, fecha, duracion)
+      if (!slots.length) return { texto: `[Sistema: no hay horarios disponibles el ${fecha} en el equipo. Sugiere al cliente otra fecha, no inventes horarios.]` }
+      return { texto: `[Sistema: horarios REALMENTE disponibles el ${fecha} (equipo): ${slots.join(', ')}. Ofrece solo estas opciones al cliente, nunca inventes otras.]` }
     } catch (err: any) {
       this.logger.warn(`[Tool] consultar_disponibilidad falló: ${err.message}`)
       return { texto: `[Sistema: no se pudo consultar disponibilidad (${err.message}).]` }
@@ -125,17 +141,47 @@ export class ToolExecutorService {
   }
 
   /**
-   * Crea una Reserva agnóstica al tipo de agente: sin `agente_id` queda consigo mismo
-   * (seguimiento); con `agente_id` de un agente humano, se valida horario y solapamiento
-   * en ReservacionService.crear (solo aplica esa validación estricta para tipo 'humano').
+   * Crea una Reserva agnóstica al tipo de agente. Resolución del destinatario, en orden:
+   * 1. `agente_id` explícito (compatibilidad con prompts antiguos que ya lo usan).
+   * 2. `agente` por NOMBRE — nunca se le pide un ID al cliente final.
+   * 3. Sin nada: si hay un solo humano activo lo usa directo; si hay varios, el primero
+   *    libre en ese horario; si no hay ninguno, agenda consigo misma (seguimiento IA).
+   * ReservacionService.crear valida horario/solapamiento (solo aplica a tipo 'humano').
    */
   private async agendarCita(input: any, ctx: ToolContexto): Promise<ToolResult> {
-    const agenteObjetivoId = input?.agente_id ? String(input.agente_id) : ctx.agenteId
     const fechaHora = String(input?.fecha_hora || '').trim().replace(' ', 'T')
     const titulo = String(input?.titulo || '').trim()
+    const nombreAgente = String(input?.agente || '').trim()
+    const agenteIdLegado = input?.agente_id ? String(input.agente_id) : ''
 
     if (!fechaHora || !titulo) {
       return { texto: '[Sistema: faltan fecha_hora o titulo para agendar la cita. No se creó ninguna reserva.]' }
+    }
+
+    const fechaInicio = new Date(fechaHora)
+    if (Number.isNaN(fechaInicio.getTime())) {
+      return { texto: '[Sistema: fecha_hora inválida, no se pudo interpretar. No se creó ninguna reserva.]' }
+    }
+    const duracionMinutos = Number(input?.duracion_minutos) || 30
+    const fechaFin = new Date(fechaInicio.getTime() + duracionMinutos * 60000)
+
+    let agenteObjetivoId = ctx.agenteId
+    let nombreAsignado: string | null = null
+
+    if (agenteIdLegado) {
+      agenteObjetivoId = agenteIdLegado
+    } else if (nombreAgente) {
+      const { agente, error } = await this.reservacionService.buscarHumanoPorNombre(ctx.clienteId, nombreAgente)
+      if (error || !agente) return { texto: `[Sistema: ${error}]` }
+      agenteObjetivoId = agente.id
+      nombreAsignado = agente.nombre
+    } else {
+      const { agente, error } = await this.reservacionService.elegirHumanoDisponible(ctx.clienteId, fechaInicio, fechaFin)
+      if (error) return { texto: `[Sistema: ${error}]` }
+      if (agente) {
+        agenteObjetivoId = agente.id
+        nombreAsignado = agente.nombre
+      }
     }
 
     try {
@@ -147,7 +193,7 @@ export class ToolExecutorService {
           contactoNombre: conversacion?.contacto || 'Cliente WhatsApp',
           contactoTelefono: conversacion?.contacto,
           fechaInicio: fechaHora,
-          duracionMinutos: Number(input?.duracion_minutos) || undefined,
+          duracionMinutos: input?.duracion_minutos ? duracionMinutos : undefined,
           titulo,
           descripcion: input?.notas,
         },
@@ -156,8 +202,9 @@ export class ToolExecutorService {
       )
 
       const fechaLegible = new Date(reserva.fechaInicio).toLocaleString('es-BO', { dateStyle: 'medium', timeStyle: 'short' })
+      const conQuien = nombreAsignado ? ` con ${nombreAsignado}` : ''
       return {
-        texto: `[Sistema: cita agendada con éxito, código ${reserva.codigoReserva}, para el ${fechaLegible}. Confírmaselo al cliente con naturalidad en una línea.]`,
+        texto: `[Sistema: cita agendada con éxito${conQuien}, código ${reserva.codigoReserva}, para el ${fechaLegible}. Confírmaselo al cliente con naturalidad en una línea, mencionando el nombre de la persona si corresponde.]`,
       }
     } catch (err: any) {
       this.logger.warn(`[Tool] agendar_cita falló: ${err.message}`)

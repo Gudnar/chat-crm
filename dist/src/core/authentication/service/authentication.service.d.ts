@@ -30,6 +30,7 @@ export declare class AuthenticationService extends BaseService {
             clienteId?: string | null | undefined;
             cliente?: import("../../cliente/entity/cliente.entity").Cliente | null | undefined;
             rolClienteId?: string | null | undefined;
+            tema?: string | undefined;
             hashPassword?: (() => Promise<void>) | undefined;
             estado?: string | undefined;
             transaccion?: string | undefined;

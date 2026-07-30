@@ -8,6 +8,7 @@ export declare class CreateProductoDto {
     precioOferta?: number;
     moneda?: string;
     stock?: number;
+    fechaDisponibilidad?: string;
     imagenes?: string[];
     detalles?: Record<string, any>;
 }

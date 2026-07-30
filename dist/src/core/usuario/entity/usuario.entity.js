@@ -99,6 +99,10 @@ __decorate([
     __metadata("design:type", Object)
 ], Usuario.prototype, "rolClienteId", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: 'tema', length: 20, default: 'dark' }),
+    __metadata("design:type", String)
+], Usuario.prototype, "tema", void 0);
+__decorate([
     (0, typeorm_1.BeforeInsert)(),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),

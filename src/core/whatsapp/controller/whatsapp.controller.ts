@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, Res, UseGuards, Request, HttpCode, Logger } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Get, Post, Query, Res, UseGuards, Request, HttpCode, Logger } from '@nestjs/common'
 import { Response } from 'express'
 import { JwtAuthGuard } from '../../authentication/guards/jwt-auth.guard'
 import { WhatsappService } from '../service/whatsapp.service'
@@ -107,7 +107,7 @@ export class WhatsappController {
   @UseGuards(JwtAuthGuard)
   @Get('config')
   async obtenerConfig(@Request() req: any) {
-    const config = await this.waService.obtenerConfig(req.user.clienteId)
+    const config = await this.waService.obtenerConfig(this.clienteIdDe(req))
     return {
       ...config,
       accessToken: config.accessToken ? '••••••••••••••••' : '',
@@ -118,7 +118,7 @@ export class WhatsappController {
   @UseGuards(JwtAuthGuard)
   @Post('config')
   async guardarConfig(@Body() dto: WhatsappConfigDto, @Request() req: any) {
-    await this.waService.guardarConfig(req.user.clienteId, dto, req.user.id)
+    await this.waService.guardarConfig(this.clienteIdDe(req), dto, req.user.id)
     return new SuccessResponseDto(null, 'Configuración WhatsApp guardada correctamente')
   }
 
@@ -128,7 +128,7 @@ export class WhatsappController {
     // If accessToken not provided in request, use the saved one
     let token = dto.accessToken;
     if (!token) {
-      const config = await this.waService.obtenerConfig(req.user.clienteId);
+      const config = await this.waService.obtenerConfig(this.clienteIdDe(req));
       token = config.accessToken;
     }
     return this.waService.testConexion(token, dto.phoneNumberId)
@@ -137,14 +137,28 @@ export class WhatsappController {
   @UseGuards(JwtAuthGuard)
   @Get('status')
   async obtenerEstado(@Request() req: any) {
-    return this.waService.obtenerEstadisticas(req.user.clienteId)
+    return this.waService.obtenerEstadisticas(this.clienteIdDe(req))
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('send')
   async enviarMensaje(@Body() dto: EnviarMensajeDto, @Request() req: any) {
-    const config = await this.waService.obtenerConfig(req.user.clienteId)
+    const config = await this.waService.obtenerConfig(this.clienteIdDe(req))
     const result = await this.waService.enviarTexto(dto.celular, dto.mensaje, config)
     return new SuccessResponseDto(result, 'Mensaje enviado')
+  }
+
+  /**
+   * SUPER_ADMIN (usuario.cliente_id NULL) administra WhatsApp de un cliente concreto
+   * seleccionado en el frontend — sin este fallback, req.user.clienteId es null y la
+   * config se guarda/lee de un tenant inexistente (el mismo gotcha ya resuelto en
+   * agentes-humanos, pendiente aquí desde el inicio de este controller).
+   */
+  private clienteIdDe(req: any): string {
+    const deSesion = req.user?.clienteId
+    if (deSesion) return String(deSesion)
+    const deQuery = req.query?.clienteId
+    if (deQuery) return String(deQuery)
+    throw new BadRequestException('Debes indicar el cliente a administrar (parámetro clienteId)')
   }
 }

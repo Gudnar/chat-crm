@@ -145,6 +145,56 @@ let ReservacionService = ReservacionService_1 = class ReservacionService extends
             return !delDia.some(r => this.seSolapan(inicio, fin, r.fechaInicio, r.fechaFin));
         });
     }
+    normalizarNombre(texto) {
+        return texto.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    }
+    async buscarHumanoPorNombre(clienteId, nombreSolicitado) {
+        const humanos = await this.agenteService.listarHumanosActivos(clienteId);
+        const termino = this.normalizarNombre(nombreSolicitado);
+        const coincidencias = humanos.filter(a => this.normalizarNombre(a.nombre).includes(termino));
+        if (coincidencias.length === 0) {
+            const nombres = humanos.map(a => a.nombre).join(', ') || 'no hay nadie registrado en el equipo humano';
+            return { agente: null, error: `No encontré a nadie llamado "${nombreSolicitado}" en el equipo. Las personas disponibles son: ${nombres}. Pregúntale al cliente con cuál de ellas prefiere, usando el nombre (nunca pidas un ID).` };
+        }
+        if (coincidencias.length > 1) {
+            const nombres = coincidencias.map(a => a.nombre).join(', ');
+            return { agente: null, error: `Hay varias personas que coinciden con "${nombreSolicitado}": ${nombres}. Pídele al cliente que precise el nombre completo.` };
+        }
+        return { agente: coincidencias[0] };
+    }
+    async elegirHumanoDisponible(clienteId, fechaInicio, fechaFin) {
+        const humanos = await this.agenteService.listarHumanosActivos(clienteId);
+        if (humanos.length === 0)
+            return { agente: null };
+        if (humanos.length === 1)
+            return { agente: humanos[0] };
+        for (const candidato of humanos) {
+            const libre = await this.estaLibreEnHorario(candidato.id, clienteId, fechaInicio, fechaFin);
+            if (libre)
+                return { agente: candidato };
+        }
+        const nombres = humanos.map(a => a.nombre).join(', ');
+        return { agente: null, error: `Nadie del equipo (${nombres}) tiene ese horario libre. Ofrécele al cliente otra fecha/hora.` };
+    }
+    async estaLibreEnHorario(agenteId, clienteId, fechaInicio, fechaFin) {
+        try {
+            await this.validarDentroDeHorario(agenteId, clienteId, fechaInicio, fechaFin);
+            await this.validarSinSolapamiento(agenteId, clienteId, fechaInicio, fechaFin);
+            return true;
+        }
+        catch {
+            return false;
+        }
+    }
+    async obtenerDisponibilidadEquipo(clienteId, fecha, duracionMinutos) {
+        const humanos = await this.agenteService.listarHumanosActivos(clienteId);
+        const slots = new Set();
+        for (const humano of humanos) {
+            const libres = await this.obtenerDisponibilidad(humano.id, clienteId, fecha, duracionMinutos);
+            libres.forEach(s => slots.add(s));
+        }
+        return Array.from(slots).sort();
+    }
     aFechaLocal(fecha, horaHHmm) {
         const [anio, mes, dia] = fecha.split('-').map(Number);
         const [h, m] = horaHHmm.split(':').map(Number);

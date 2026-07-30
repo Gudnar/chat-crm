@@ -169,7 +169,7 @@ export class ProductoService extends BaseService {
       if (p.modelo) lineas.push(`  Modelo: ${p.modelo}`)
       if (p.categoria) lineas.push(`  Categoría: ${p.categoria}`)
       lineas.push(`  Precio: ${precio}`)
-      if (p.stock != null) lineas.push(`  Disponibilidad: ${p.stock > 0 ? `${p.stock} en stock` : 'Sin stock'}`)
+      lineas.push(`  Disponibilidad: ${this.describirDisponibilidad(p)}`)
       if (p.descripcion) lineas.push(`  ${p.descripcion}`)
       if (Object.keys(p.detalles || {}).length) {
         const extras = Object.entries(p.detalles).map(([k, v]) => `${k}: ${v}`).join(', ')
@@ -177,6 +177,26 @@ export class ProductoService extends BaseService {
       }
       return lineas.join('\n')
     }).join('\n\n')
+  }
+
+  /**
+   * Traduce fecha_disponibilidad + stock a un mensaje que el modelo puede usar
+   * directamente: si la fecha todavía no llega, nunca ofrecer el producto como
+   * disponible ahora mismo, aunque haya stock cargado (recién está por llegar).
+   */
+  private describirDisponibilidad(p: Producto): string {
+    if (p.fechaDisponibilidad) {
+      const disponibleDesde = new Date(p.fechaDisponibilidad)
+      const hoy = new Date()
+      hoy.setHours(0, 0, 0, 0)
+      if (disponibleDesde > hoy) {
+        const fechaLegible = disponibleDesde.toLocaleDateString('es-BO', { day: 'numeric', month: 'long', year: 'numeric' })
+        return `Aún NO disponible — llega el ${fechaLegible}. No lo ofrezcas como disponible ahora; dile al cliente que estará disponible pronto / que recién llega esa fecha.`
+      }
+    }
+    return p.stock != null
+      ? (p.stock > 0 ? `${p.stock} en stock, disponible para la venta` : 'Sin stock por el momento')
+      : 'Disponible'
   }
 
   // ── Importar/Exportar Excel ───────────────────────────────────
@@ -200,6 +220,7 @@ export class ProductoService extends BaseService {
       { header: 'Precio Oferta', key: 'precioOferta', width: 15 },
       { header: 'Moneda', key: 'moneda', width: 10 },
       { header: 'Stock', key: 'stock', width: 10 },
+      { header: 'Fecha Disponibilidad', key: 'fechaDisponibilidad', width: 18 },
       { header: 'Activo', key: 'activo', width: 10 },
     ]
 
@@ -217,6 +238,7 @@ export class ProductoService extends BaseService {
         precioOferta: p.precioOferta || '',
         moneda: p.moneda || 'PEN',
         stock: p.stock ?? '',
+        fechaDisponibilidad: p.fechaDisponibilidad || '',
         activo: p.activo ? 'Sí' : 'No',
       })
     })
@@ -355,6 +377,7 @@ export class ProductoService extends BaseService {
       precioOferta: col('precio oferta', 'oferta'),
       moneda: col('moneda'),
       stock: col('stock'),
+      fechaDisponibilidad: col('fecha disponibilidad', 'disponibilidad'),
       activo: col('activo'),
     }
 
@@ -418,6 +441,7 @@ export class ProductoService extends BaseService {
               precioOferta: null,
               moneda: 'USD',
               stock: null,
+              fechaDisponibilidad: celda(cols.fechaDisponibilidad) || null,
               activo: true,
               detalles,
             },
@@ -445,6 +469,7 @@ export class ProductoService extends BaseService {
               precioOferta: isNaN(precioOferta) ? null : precioOferta,
               moneda: celda(cols.moneda) || 'PEN',
               stock: isNaN(stockVal) ? null : stockVal,
+              fechaDisponibilidad: celda(cols.fechaDisponibilidad) || null,
               activo: (celda(cols.activo) || 'sí').toLowerCase() !== 'no',
               detalles: {},
             },

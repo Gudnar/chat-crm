@@ -7,7 +7,7 @@ import { Herramienta } from '../../herramienta/entity/herramienta.entity'
 import { HERRAMIENTAS_DEFAULT } from '../../herramienta/herramienta.defaults'
 import { CreateAgenteDto, UpdateAgenteDto } from '../dto/create-agente.dto'
 import { BaseService } from '../../../common/base/base-service'
-import { Status, Transacccion } from '../../../common/constants'
+import { Status, Transacccion, TipoAgente } from '../../../common/constants'
 import { Messages } from '../../../common/constants/response-messages'
 import { ConfiguracionClienteService } from '../../cliente/service/configuracion-cliente.service'
 
@@ -36,6 +36,14 @@ export class AgenteService extends BaseService {
     const agente = await this.agenteRepository.findOne({ where: { id, estado: Status.ACTIVE, clienteId } })
     if (!agente) throw new NotFoundException(Messages.AGENTE_NOT_FOUND)
     return agente
+  }
+
+  /** Equipo humano activo de un cliente — usado para resolver "agenda con Fulano" sin pedirle un ID al usuario final. */
+  async listarHumanosActivos(clienteId: string): Promise<Agente[]> {
+    return this.agenteRepository.find({
+      where: { clienteId, tipoAgente: TipoAgente.HUMANO, activo: true, estado: Status.ACTIVE },
+      order: { nombre: 'ASC' },
+    })
   }
 
   async crear(dto: CreateAgenteDto, usuarioCreacion: string, clienteId: string): Promise<Agente> {

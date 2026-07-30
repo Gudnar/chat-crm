@@ -11,4 +11,5 @@ export declare class UsuarioService extends BaseService {
     crear(dto: CreateUsuarioDto, usuarioCreacion: string): Promise<Usuario>;
     actualizarContadorBloqueos(id: string, intentos: number): Promise<void>;
     actualizarDatosBloqueo(id: string, codigo: string | null, fecha: any): Promise<void>;
+    actualizarTema(id: string, tema: string): Promise<void>;
 }

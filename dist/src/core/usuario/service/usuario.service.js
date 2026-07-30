@@ -58,6 +58,9 @@ let UsuarioService = UsuarioService_1 = class UsuarioService extends base_servic
     async actualizarDatosBloqueo(id, codigo, fecha) {
         await this.usuarioRepository.update(id, { fechaBloqueo: fecha, intentos: 0 });
     }
+    async actualizarTema(id, tema) {
+        await this.usuarioRepository.update(id, { tema });
+    }
 };
 UsuarioService = UsuarioService_1 = __decorate([
     (0, common_1.Injectable)(),

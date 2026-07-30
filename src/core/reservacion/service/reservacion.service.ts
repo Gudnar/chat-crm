@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Not, Repository } from 'typeorm'
+import { Agente } from '../../agente/entity/agente.entity'
 import { Reserva } from '../entity/reserva.entity'
 import { CreateReservaDto, UpdateReservaDto, ActualizarEstadoReservaDto } from '../dto/reserva.dto'
 import { ServicioAgenteService } from './servicio-agente.service'
@@ -165,6 +166,68 @@ export class ReservacionService extends BaseService {
       const fin = new Date(inicio.getTime() + duracionMinutos * 60000)
       return !delDia.some(r => this.seSolapan(inicio, fin, r.fechaInicio, r.fechaFin))
     })
+  }
+
+  /** Quita tildes/diacríticos para comparar nombres sin importar cómo los tipeó el cliente ("María" == "Maria"). */
+  private normalizarNombre(texto: string): string {
+    return texto.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  }
+
+  /** Busca por NOMBRE en el equipo humano activo (nunca por ID — el cliente final no conoce IDs internos). */
+  async buscarHumanoPorNombre(clienteId: string, nombreSolicitado: string): Promise<{ agente: Agente | null; error?: string }> {
+    const humanos = await this.agenteService.listarHumanosActivos(clienteId)
+    const termino = this.normalizarNombre(nombreSolicitado)
+    const coincidencias = humanos.filter(a => this.normalizarNombre(a.nombre).includes(termino))
+
+    if (coincidencias.length === 0) {
+      const nombres = humanos.map(a => a.nombre).join(', ') || 'no hay nadie registrado en el equipo humano'
+      return { agente: null, error: `No encontré a nadie llamado "${nombreSolicitado}" en el equipo. Las personas disponibles son: ${nombres}. Pregúntale al cliente con cuál de ellas prefiere, usando el nombre (nunca pidas un ID).` }
+    }
+    if (coincidencias.length > 1) {
+      const nombres = coincidencias.map(a => a.nombre).join(', ')
+      return { agente: null, error: `Hay varias personas que coinciden con "${nombreSolicitado}": ${nombres}. Pídele al cliente que precise el nombre completo.` }
+    }
+    return { agente: coincidencias[0] }
+  }
+
+  /**
+   * Sin nombre especificado: si hay 0 humanos, deja que el llamador decida el fallback
+   * (IA); si hay 1, lo usa directo; si hay varios, elige el primero libre en ese horario
+   * exacto para no forzar al cliente a elegir entre nombres que ni conoce.
+   */
+  async elegirHumanoDisponible(clienteId: string, fechaInicio: Date, fechaFin: Date): Promise<{ agente: Agente | null; error?: string }> {
+    const humanos = await this.agenteService.listarHumanosActivos(clienteId)
+
+    if (humanos.length === 0) return { agente: null }
+    if (humanos.length === 1) return { agente: humanos[0] }
+
+    for (const candidato of humanos) {
+      const libre = await this.estaLibreEnHorario(candidato.id, clienteId, fechaInicio, fechaFin)
+      if (libre) return { agente: candidato }
+    }
+    const nombres = humanos.map(a => a.nombre).join(', ')
+    return { agente: null, error: `Nadie del equipo (${nombres}) tiene ese horario libre. Ofrécele al cliente otra fecha/hora.` }
+  }
+
+  private async estaLibreEnHorario(agenteId: string, clienteId: string, fechaInicio: Date, fechaFin: Date): Promise<boolean> {
+    try {
+      await this.validarDentroDeHorario(agenteId, clienteId, fechaInicio, fechaFin)
+      await this.validarSinSolapamiento(agenteId, clienteId, fechaInicio, fechaFin)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /** Unión de horarios libres de TODO el equipo humano activo — para "¿qué horarios tienen?" sin especificar a quién. */
+  async obtenerDisponibilidadEquipo(clienteId: string, fecha: string, duracionMinutos: number): Promise<string[]> {
+    const humanos = await this.agenteService.listarHumanosActivos(clienteId)
+    const slots = new Set<string>()
+    for (const humano of humanos) {
+      const libres = await this.obtenerDisponibilidad(humano.id, clienteId, fecha, duracionMinutos)
+      libres.forEach(s => slots.add(s))
+    }
+    return Array.from(slots).sort()
   }
 
   /** Construye un Date en hora LOCAL a partir de "YYYY-MM-DD" + "HH:mm" (evita el desfase de `new Date("YYYY-MM-DD")`, que se interpreta en UTC). */

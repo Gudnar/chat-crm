@@ -13,4 +13,5 @@ export declare class AgenteController {
         role: 'user' | 'assistant';
         content: string;
     }[] | undefined, req: any): Promise<SuccessResponseDto>;
+    private clienteIdDe;
 }

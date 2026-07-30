@@ -36,6 +36,10 @@ export class Producto extends AuditoriaEntity {
   @Column({ name: 'stock', type: 'int', nullable: true })
   stock?: number
 
+  /** Fecha desde la que el producto puede venderse. Null = disponible desde siempre. */
+  @Column({ name: 'fecha_disponibilidad', type: 'date', nullable: true })
+  fechaDisponibilidad?: string | null
+
   @Column({ name: 'imagenes', type: 'jsonb', default: '[]' })
   imagenes: string[]
 

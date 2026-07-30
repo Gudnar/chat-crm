@@ -37,4 +37,5 @@ export declare class WhatsappController {
         mensaje: string;
     }>;
     enviarMensaje(dto: EnviarMensajeDto, req: any): Promise<SuccessResponseDto>;
+    private clienteIdDe;
 }
