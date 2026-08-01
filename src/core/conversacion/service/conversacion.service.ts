@@ -4,7 +4,7 @@ import { Repository } from 'typeorm'
 import { Conversacion } from '../entity/conversacion.entity'
 import { CreateConversacionDto, AgregarMensajeDto } from '../dto/create-conversacion.dto'
 import { BaseService } from '../../../common/base/base-service'
-import { Status, Transacccion } from '../../../common/constants'
+import { Status, Transacccion, TipoAgente } from '../../../common/constants'
 import { Messages } from '../../../common/constants/response-messages'
 
 @Injectable()
@@ -22,7 +22,7 @@ export class ConversacionService extends BaseService {
     if (agenteId) where.agenteId = agenteId
     return this.conversacionRepository.find({
       where,
-      order: { fechaCreacion: 'DESC' },
+      order: { fechaModificacion: 'DESC' },
       take: 100,
     })
   }
@@ -65,6 +65,16 @@ export class ConversacionService extends BaseService {
     conv.totalMensajes = conv.mensajes.length
     conv.transaccion = Transacccion.ACTUALIZAR
     return this.conversacionRepository.save(conv)
+  }
+
+  /** Marca la conversación como atendida directamente por un agente humano (canal staffeado por una persona, sin IA de por medio). */
+  async asignarAgenteHumano(id: string, agenteHumanoId: string): Promise<void> {
+    const conv = await this.obtener(id)
+    conv.agenteHumanoId = agenteHumanoId
+    conv.tipoAgenteAsignado = TipoAgente.HUMANO
+    conv.fechaAsignacionHumano = new Date()
+    conv.transaccion = Transacccion.ACTUALIZAR
+    await this.conversacionRepository.save(conv)
   }
 
   async yaSeEnvioRecurso(id: string, recursoId: string): Promise<boolean> {

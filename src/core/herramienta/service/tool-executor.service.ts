@@ -7,6 +7,7 @@ import { RecursoService } from '../../recurso/service/recurso.service'
 import { Recurso, TipoRecurso } from '../../recurso/entity/recurso.entity'
 import { ReservacionService } from '../../reservacion/service/reservacion.service'
 import { USUARIO_SISTEMA } from '../../../common/constants'
+import { fechaHoraBoliviaAUtc } from '../../../common/lib/fecha-bolivia.util'
 
 export interface ToolContexto {
   conversacionId: string
@@ -158,7 +159,7 @@ export class ToolExecutorService {
       return { texto: '[Sistema: faltan fecha_hora o titulo para agendar la cita. No se creó ninguna reserva.]' }
     }
 
-    const fechaInicio = new Date(fechaHora)
+    const fechaInicio = fechaHoraBoliviaAUtc(fechaHora)
     if (Number.isNaN(fechaInicio.getTime())) {
       return { texto: '[Sistema: fecha_hora inválida, no se pudo interpretar. No se creó ninguna reserva.]' }
     }
@@ -201,7 +202,7 @@ export class ToolExecutorService {
         ctx.clienteId,
       )
 
-      const fechaLegible = new Date(reserva.fechaInicio).toLocaleString('es-BO', { dateStyle: 'medium', timeStyle: 'short' })
+      const fechaLegible = new Date(reserva.fechaInicio).toLocaleString('es-BO', { timeZone: 'America/La_Paz', dateStyle: 'medium', timeStyle: 'short' })
       const conQuien = nombreAsignado ? ` con ${nombreAsignado}` : ''
       return {
         texto: `[Sistema: cita agendada con éxito${conQuien}, código ${reserva.codigoReserva}, para el ${fechaLegible}. Confírmaselo al cliente con naturalidad en una línea, mencionando el nombre de la persona si corresponde.]`,

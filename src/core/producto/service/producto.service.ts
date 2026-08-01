@@ -186,11 +186,16 @@ export class ProductoService extends BaseService {
    */
   private describirDisponibilidad(p: Producto): string {
     if (p.fechaDisponibilidad) {
+      // fecha_disponibilidad es solo fecha (sin hora) — el string ISO se parsea siempre
+      // en UTC. Para comparar "hoy" en igualdad de condiciones, se construye también en
+      // UTC a partir del día calendario de Bolivia (no del timezone ambiental del
+      // servidor, que en producción corre en Europa y podía adelantar/atrasar "hoy").
       const disponibleDesde = new Date(p.fechaDisponibilidad)
-      const hoy = new Date()
-      hoy.setHours(0, 0, 0, 0)
+      const hoyBolivia = new Date().toLocaleDateString('en-CA', { timeZone: 'America/La_Paz' }) // "YYYY-MM-DD"
+      const [anio, mes, dia] = hoyBolivia.split('-').map(Number)
+      const hoy = new Date(Date.UTC(anio, mes - 1, dia))
       if (disponibleDesde > hoy) {
-        const fechaLegible = disponibleDesde.toLocaleDateString('es-BO', { day: 'numeric', month: 'long', year: 'numeric' })
+        const fechaLegible = disponibleDesde.toLocaleDateString('es-BO', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' })
         return `Aún NO disponible — llega el ${fechaLegible}. No lo ofrezcas como disponible ahora; dile al cliente que estará disponible pronto / que recién llega esa fecha.`
       }
     }

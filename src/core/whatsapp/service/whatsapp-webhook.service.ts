@@ -8,7 +8,7 @@ import { HerramientaService } from '../../herramienta/service/herramienta.servic
 import { ToolExecutorService, ToolDocumento } from '../../herramienta/service/tool-executor.service'
 import { BaseConocimientoService } from '../../base-conocimiento/service/base-conocimiento.service'
 import { WaWebhookMessage } from '../dto/whatsapp.dto'
-import { USUARIO_SISTEMA } from '../../../common/constants'
+import { USUARIO_SISTEMA, TipoAgente } from '../../../common/constants'
 
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages'
 const MAX_HISTORY_MESSAGES = 20
@@ -89,6 +89,17 @@ export class WhatsappWebhookService {
       const conversacion = await this.encontrarOCrearConversacion(from, contactName, agente.id, clienteId)
 
       await this.conversacionService.agregarMensaje(conversacion.id, { role: 'user', content: textoUsuario })
+
+      // Canal atendido directamente por una persona del equipo (no un agente IA):
+      // el mensaje queda guardado y asignado para que el humano responda desde el
+      // panel. Claude nunca debe intervenir ni auto-responder suplantando a alguien
+      // real — sin esto, llamarClaude() usa el prompt genérico de fallback y contesta
+      // "soy [nombre], un asistente IA", lo cual es incorrecto y confunde al cliente.
+      if (agente.tipoAgente === TipoAgente.HUMANO) {
+        await this.conversacionService.asignarAgenteHumano(conversacion.id, agente.id)
+        this.logger.log(`[WA] Mensaje de ${from} guardado para el agente humano ${agente.nombre} — sin respuesta automática`)
+        return
+      }
 
       const convActualizada = await this.conversacionService.obtener(conversacion.id)
       const historial = (convActualizada.mensajes || [])
@@ -192,7 +203,11 @@ export class WhatsappWebhookService {
 
     // Sin esto, el modelo no tiene forma de saber qué día es "hoy" y no puede convertir
     // fechas relativas ("mañana", "el jueves") a un fecha_hora concreto para agendar_cita.
+    // timeZone explícito es obligatorio: sin él, toLocaleString usa el timezone del
+    // servidor (en producción, Europa/Contabo) en vez de la hora real de Bolivia —
+    // esto llegó a mostrarle al modelo "sábado" cuando en Bolivia todavía era "viernes".
     const fechaActual = `[Fecha y hora actual: ${new Date().toLocaleString('es-BO', {
+      timeZone: 'America/La_Paz',
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
     })}]`
 

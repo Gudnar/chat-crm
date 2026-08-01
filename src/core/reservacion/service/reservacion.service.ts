@@ -9,6 +9,7 @@ import { HorarioAgenteService } from './horario-agente.service'
 import { AgenteService } from '../../agente/service/agente.service'
 import { BaseService } from '../../../common/base/base-service'
 import { Status, Transacccion, TipoAgente, EstadoReserva } from '../../../common/constants'
+import { fechaHoraBoliviaAUtc } from '../../../common/lib/fecha-bolivia.util'
 
 export interface FiltrosReserva {
   agenteId?: string
@@ -58,7 +59,7 @@ export class ReservacionService extends BaseService {
     }
     duracionMinutos = duracionMinutos || 30
 
-    const fechaInicio = new Date(dto.fechaInicio)
+    const fechaInicio = fechaHoraBoliviaAUtc(dto.fechaInicio)
     if (Number.isNaN(fechaInicio.getTime())) throw new BadRequestException('fechaInicio inválida')
     const fechaFin = new Date(fechaInicio.getTime() + duracionMinutos * 60000)
 
@@ -100,7 +101,7 @@ export class ReservacionService extends BaseService {
     let fechaInicio = reserva.fechaInicio
     let duracionMinutos = dto.duracionMinutos ?? reserva.duracionMinutos
     if (dto.fechaInicio) {
-      fechaInicio = new Date(dto.fechaInicio)
+      fechaInicio = fechaHoraBoliviaAUtc(dto.fechaInicio)
       if (Number.isNaN(fechaInicio.getTime())) throw new BadRequestException('fechaInicio inválida')
     }
     const fechaFin = new Date(fechaInicio.getTime() + duracionMinutos * 60000)
@@ -230,19 +231,29 @@ export class ReservacionService extends BaseService {
     return Array.from(slots).sort()
   }
 
-  /** Construye un Date en hora LOCAL a partir de "YYYY-MM-DD" + "HH:mm" (evita el desfase de `new Date("YYYY-MM-DD")`, que se interpreta en UTC). */
+  /**
+   * Construye un Date a partir de "YYYY-MM-DD" + "HH:mm" interpretados como hora de
+   * BOLIVIA (America/La_Paz, UTC-4 fijo, sin horario de verano) — nunca la hora
+   * ambiental del proceso, que en el servidor de producción (Contabo, timezone de
+   * Europa) corrió citas 6 horas y a veces un día calendario completo respecto a lo
+   * que el cliente boliviano realmente pidió.
+   */
   private aFechaLocal(fecha: string, horaHHmm: string): Date {
     const [anio, mes, dia] = fecha.split('-').map(Number)
     const [h, m] = horaHHmm.split(':').map(Number)
-    return new Date(anio, mes - 1, dia, h, m, 0, 0)
+    return new Date(Date.UTC(anio, mes - 1, dia, h + 4, m, 0, 0))
   }
 
-  /** Formatea un Date a "YYYY-MM-DD" y "HH:mm" en hora LOCAL (nunca toISOString, que convierte a UTC y puede correr la fecha). */
+  /** Formatea un Date a "YYYY-MM-DD" y "HH:mm" en hora de Bolivia (America/La_Paz), sin depender del timezone del servidor. */
   private aFechaYHoraLocal(fecha: Date): { fecha: string; hora: string } {
-    const pad = (n: number) => String(n).padStart(2, '0')
+    const partes = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/La_Paz',
+      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+    }).formatToParts(fecha)
+    const valor = (tipo: string) => partes.find(p => p.type === tipo)?.value ?? '00'
     return {
-      fecha: `${fecha.getFullYear()}-${pad(fecha.getMonth() + 1)}-${pad(fecha.getDate())}`,
-      hora: `${pad(fecha.getHours())}:${pad(fecha.getMinutes())}`,
+      fecha: `${valor('year')}-${valor('month')}-${valor('day')}`,
+      hora: `${valor('hour')}:${valor('minute')}`,
     }
   }
 

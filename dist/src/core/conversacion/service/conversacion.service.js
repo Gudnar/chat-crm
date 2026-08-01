@@ -34,7 +34,7 @@ let ConversacionService = ConversacionService_1 = class ConversacionService exte
             where.agenteId = agenteId;
         return this.conversacionRepository.find({
             where,
-            order: { fechaCreacion: 'DESC' },
+            order: { fechaModificacion: 'DESC' },
             take: 100,
         });
     }

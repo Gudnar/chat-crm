@@ -303,7 +303,7 @@ export class OportunidadService extends BaseService {
     // Se puede registrar solo la nota, solo la próxima acción, o ambas
     const detalles = dto.nota
       ? dto.nota
-      : `Programó próxima acción: ${dto.proximaAccion}${dto.proximaAccionFecha ? ` (límite ${new Date(dto.proximaAccionFecha).toLocaleString('es-BO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })})` : ''}`
+      : `Programó próxima acción: ${dto.proximaAccion}${dto.proximaAccionFecha ? ` (límite ${new Date(dto.proximaAccionFecha).toLocaleString('es-BO', { timeZone: 'America/La_Paz', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })})` : ''}`
 
     o.historial = [...(o.historial || []), this.entradaHistorial('seguimiento', usuarioId, usuarioNombre, detalles)]
     if (dto.proximaAccion !== undefined) o.proximaAccion = dto.proximaAccion || null
