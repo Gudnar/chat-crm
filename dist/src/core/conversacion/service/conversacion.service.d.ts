@@ -10,6 +10,7 @@ export declare class ConversacionService extends BaseService {
     obtenerPorClienteId(id: string, clienteId: string): Promise<Conversacion>;
     crear(dto: CreateConversacionDto, usuarioCreacion: string, clienteId: string): Promise<Conversacion>;
     agregarMensaje(id: string, dto: AgregarMensajeDto): Promise<Conversacion>;
+    asignarAgenteHumano(id: string, agenteHumanoId: string): Promise<void>;
     yaSeEnvioRecurso(id: string, recursoId: string): Promise<boolean>;
     marcarRecursoEnviado(id: string, recursoId: string): Promise<void>;
     actualizarScore(id: string, score: number): Promise<void>;

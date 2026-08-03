@@ -20,6 +20,7 @@ const recurso_service_1 = require("../../recurso/service/recurso.service");
 const recurso_entity_1 = require("../../recurso/entity/recurso.entity");
 const reservacion_service_1 = require("../../reservacion/service/reservacion.service");
 const constants_1 = require("../../../common/constants");
+const fecha_bolivia_util_1 = require("../../../common/lib/fecha-bolivia.util");
 let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
     constructor(conversacionService, productoService, confClienteService, recursoService, reservacionService) {
         this.conversacionService = conversacionService;
@@ -42,6 +43,9 @@ let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
                 case 'enviar_recurso': return await this.enviarRecurso(input, contexto);
                 case 'agendar_cita': return await this.agendarCita(input, contexto);
                 case 'consultar_disponibilidad': return await this.consultarDisponibilidad(input, contexto);
+                case 'preguntar_opciones': return await this.preguntarOpciones(input, contexto);
+                case 'enviar_boton_link': return await this.enviarBotonLink(input, contexto);
+                case 'solicitar_ubicacion': return await this.solicitarUbicacion(input, contexto);
                 default:
                     this.logger.warn(`[Tool] Herramienta desconocida: ${nombre}`);
                     return { texto: `Herramienta "${nombre}" no está implementada.` };
@@ -64,6 +68,49 @@ let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
     async escalarAgente(input, ctx) {
         await this.conversacionService.escalar(ctx.conversacionId, input.razon);
         return { texto: `Conversación escalada a agente humano. Razón: ${input.razon}. Prioridad: ${input.prioridad ?? 'media'}` };
+    }
+    async preguntarOpciones(input, _ctx) {
+        const pregunta = String(input?.pregunta || '').trim();
+        const opcionesInput = Array.isArray(input?.opciones) ? input.opciones : [];
+        if (!pregunta || opcionesInput.length < 2) {
+            return { texto: '[Sistema: preguntar_opciones necesita una pregunta y al menos 2 opciones. No se envió nada.]' };
+        }
+        if (opcionesInput.length > 10) {
+            return { texto: '[Sistema: máximo 10 opciones — es el límite de WhatsApp. Reduce la lista.]' };
+        }
+        const botones = opcionesInput.slice(0, 10).map((o, i) => ({
+            id: `op_${i + 1}`,
+            titulo: String(o?.texto || '').trim().slice(0, 24) || `Opción ${i + 1}`,
+        }));
+        return {
+            texto: `[Sistema: se le presentaron ${botones.length} opciones al cliente (${botones.map(b => b.titulo).join(', ')}). Espera a que elija tocando un botón antes de continuar — no asumas ni inventes cuál seleccionó.]`,
+            opciones: { pregunta, botones },
+        };
+    }
+    async enviarBotonLink(input, _ctx) {
+        const mensaje = String(input?.mensaje || '').trim();
+        const textoBoton = String(input?.texto_boton || '').trim();
+        const url = String(input?.url || '').trim();
+        if (!mensaje || !textoBoton || !url) {
+            return { texto: '[Sistema: enviar_boton_link necesita mensaje, texto_boton y url. No se envió nada.]' };
+        }
+        if (!/^https?:\/\//i.test(url)) {
+            return { texto: '[Sistema: la url debe empezar con http:// o https://. No se envió nada.]' };
+        }
+        return {
+            texto: `[Sistema: se le mandó al cliente un botón "${textoBoton}" que lleva a ${url}.]`,
+            botonLink: { mensaje, textoBoton: textoBoton.slice(0, 20), url },
+        };
+    }
+    async solicitarUbicacion(input, _ctx) {
+        const mensaje = String(input?.mensaje || '').trim();
+        if (!mensaje) {
+            return { texto: '[Sistema: solicitar_ubicacion necesita un mensaje. No se envió nada.]' };
+        }
+        return {
+            texto: '[Sistema: se le pidió al cliente que comparta su ubicación con el botón nativo de WhatsApp. Espera a que la mande — no inventes ni asumas dónde está.]',
+            solicitudUbicacion: { mensaje },
+        };
     }
     async crearNota(input, ctx) {
         await this.conversacionService.agregarNota(ctx.conversacionId, input.nota);
@@ -124,7 +171,7 @@ let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
         if (!fechaHora || !titulo) {
             return { texto: '[Sistema: faltan fecha_hora o titulo para agendar la cita. No se creó ninguna reserva.]' };
         }
-        const fechaInicio = new Date(fechaHora);
+        const fechaInicio = (0, fecha_bolivia_util_1.fechaHoraBoliviaAUtc)(fechaHora);
         if (Number.isNaN(fechaInicio.getTime())) {
             return { texto: '[Sistema: fecha_hora inválida, no se pudo interpretar. No se creó ninguna reserva.]' };
         }
@@ -163,7 +210,7 @@ let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
                 titulo,
                 descripcion: input?.notas,
             }, constants_1.USUARIO_SISTEMA, ctx.clienteId);
-            const fechaLegible = new Date(reserva.fechaInicio).toLocaleString('es-BO', { dateStyle: 'medium', timeStyle: 'short' });
+            const fechaLegible = new Date(reserva.fechaInicio).toLocaleString('es-BO', { timeZone: 'America/La_Paz', dateStyle: 'medium', timeStyle: 'short' });
             const conQuien = nombreAsignado ? ` con ${nombreAsignado}` : '';
             return {
                 texto: `[Sistema: cita agendada con éxito${conQuien}, código ${reserva.codigoReserva}, para el ${fechaLegible}. Confírmaselo al cliente con naturalidad en una línea, mencionando el nombre de la persona si corresponde.]`,

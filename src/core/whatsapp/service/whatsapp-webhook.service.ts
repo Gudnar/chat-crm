@@ -1,11 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import axios from 'axios'
-import { WhatsappService } from './whatsapp.service'
+import { existsSync, mkdirSync, writeFileSync } from 'fs'
+import { join } from 'path'
+import { WhatsappService, WaConfig } from './whatsapp.service'
 import { ConversacionService } from '../../conversacion/service/conversacion.service'
 import { AgenteService } from '../../agente/service/agente.service'
 import { ConfiguracionClienteService } from '../../cliente/service/configuracion-cliente.service'
 import { HerramientaService } from '../../herramienta/service/herramienta.service'
-import { ToolExecutorService, ToolDocumento } from '../../herramienta/service/tool-executor.service'
+import { ToolExecutorService, ToolDocumento, ToolOpciones, ToolBotonLink, ToolSolicitudUbicacion } from '../../herramienta/service/tool-executor.service'
 import { BaseConocimientoService } from '../../base-conocimiento/service/base-conocimiento.service'
 import { WaWebhookMessage } from '../dto/whatsapp.dto'
 import { USUARIO_SISTEMA, TipoAgente } from '../../../common/constants'
@@ -26,6 +29,9 @@ interface LlamarClaudeResult {
   documentos: ToolDocumento[]
   audios: string[]
   videos: string[]
+  opciones: ToolOpciones[]
+  botonesLink: ToolBotonLink[]
+  solicitudesUbicacion: ToolSolicitudUbicacion[]
 }
 
 @Injectable()
@@ -40,6 +46,7 @@ export class WhatsappWebhookService {
     private readonly herramientaService: HerramientaService,
     private readonly toolExecutor: ToolExecutorService,
     private readonly baseConocimientoService: BaseConocimientoService,
+    private readonly configService: ConfigService,
   ) {}
 
   // ── Main entry point ─────────────────────────────────────────
@@ -88,7 +95,13 @@ export class WhatsappWebhookService {
 
       const conversacion = await this.encontrarOCrearConversacion(from, contactName, agente.id, clienteId)
 
-      await this.conversacionService.agregarMensaje(conversacion.id, { role: 'user', content: textoUsuario })
+      let adjunto: { url: string; tipo: string; nombre?: string } | undefined
+      if (this.esMensajeConAdjunto(rawMessage)) {
+        adjunto = (await this.descargarYGuardarAdjunto(rawMessage, config)) ?? undefined
+      }
+
+      const ubicacion = this.extraerUbicacion(rawMessage)
+      await this.conversacionService.agregarMensaje(conversacion.id, { role: 'user', content: textoUsuario, adjunto, ubicacion })
 
       // Canal atendido directamente por una persona del equipo (no un agente IA):
       // el mensaje queda guardado y asignado para que el humano responda desde el
@@ -106,7 +119,7 @@ export class WhatsappWebhookService {
         .slice(-MAX_HISTORY_MESSAGES)
         .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
 
-      const { respuesta, textosPrevios, imagenes, documentos, audios, videos } = await this.llamarClaude(agente, historial, clienteId, conversacion.id)
+      const { respuesta, textosPrevios, imagenes, documentos, audios, videos, opciones, botonesLink, solicitudesUbicacion } = await this.llamarClaude(agente, historial, clienteId, conversacion.id)
       if (!respuesta && textosPrevios.length === 0) return
 
       // Texto escrito por Claude ANTES de invocar una tool (ej. el checklist previo
@@ -140,7 +153,43 @@ export class WhatsappWebhookService {
         await this.waService.enviarVideo(from, videoUrl, '', config)
       }
 
-      this.logger.log(`[WA] Respuesta enviada a ${from} (${imagenes.length} imágenes, ${documentos.length} documentos, ${audios.length} audios, ${videos.length} videos)`)
+      // Preguntas con botones/lista (herramienta preguntar_opciones) — se mandan al
+      // final, después del texto, y quedan guardadas en el historial para que se vean
+      // en el panel igual que cualquier otro mensaje del agente.
+      for (const pregunta of opciones) {
+        if (pregunta.botones.length <= 3) {
+          await this.waService.enviarBotones(from, pregunta.pregunta, pregunta.botones, config)
+        } else {
+          await this.waService.enviarLista(from, pregunta.pregunta, 'Ver opciones', pregunta.botones, config)
+        }
+        await this.conversacionService.agregarMensaje(conversacion.id, {
+          role: 'assistant',
+          content: pregunta.pregunta,
+          interactivo: pregunta,
+        })
+      }
+
+      // Botones con link externo (herramienta enviar_boton_link)
+      for (const link of botonesLink) {
+        await this.waService.enviarBotonLink(from, link.mensaje, link.textoBoton, link.url, config)
+        await this.conversacionService.agregarMensaje(conversacion.id, {
+          role: 'assistant',
+          content: link.mensaje,
+          enlace: { texto: link.textoBoton, url: link.url },
+        })
+      }
+
+      // Solicitudes de ubicación (herramienta solicitar_ubicacion)
+      for (const solicitud of solicitudesUbicacion) {
+        await this.waService.enviarSolicitudUbicacion(from, solicitud.mensaje, config)
+        await this.conversacionService.agregarMensaje(conversacion.id, {
+          role: 'assistant',
+          content: solicitud.mensaje,
+          pidioUbicacion: true,
+        })
+      }
+
+      this.logger.log(`[WA] Respuesta enviada a ${from} (${imagenes.length} imágenes, ${documentos.length} documentos, ${audios.length} audios, ${videos.length} videos, ${opciones.length} preguntas con opciones, ${botonesLink.length} botones link, ${solicitudesUbicacion.length} solicitudes de ubicación)`)
     } catch (err: any) {
       this.logger.error(`[WA] Error procesando mensaje de ${from}: ${err.message}`)
     }
@@ -154,21 +203,91 @@ export class WhatsappWebhookService {
     if (msg.type === 'interactive') {
       return msg.interactive?.button_reply?.title || msg.interactive?.list_reply?.title || null
     }
+    // Antes estos 3 tipos se descartaban en silencio: el cliente mandaba una foto,
+    // un comprobante o una nota de voz y nunca quedaba ni un rastro en la plataforma.
+    if (msg.type === 'image') return msg.image?.caption || '[Imagen adjunta]'
+    if (msg.type === 'document') return msg.document?.caption || `[Documento adjunto: ${msg.document?.filename || 'archivo'}]`
+    if (msg.type === 'audio') return '[Nota de voz / audio adjunto]'
+    if (msg.type === 'location' && msg.location) {
+      const { latitude, longitude, name } = msg.location
+      return `[Ubicación compartida: ${latitude}, ${longitude}${name ? ` — ${name}` : ''}]`
+    }
     return null
   }
 
+  private extraerUbicacion(msg: WaWebhookMessage): { latitud: number; longitud: number; nombre?: string; direccion?: string } | undefined {
+    if (msg.type !== 'location' || !msg.location) return undefined
+    return {
+      latitud: msg.location.latitude,
+      longitud: msg.location.longitude,
+      nombre: msg.location.name,
+      direccion: msg.location.address,
+    }
+  }
+
+  private esMensajeConAdjunto(msg: WaWebhookMessage): boolean {
+    return msg.type === 'image' || msg.type === 'document' || msg.type === 'audio'
+  }
+
+  /** Descarga el adjunto real desde Meta y lo guarda en uploads/ para poder mostrarlo en el panel. */
+  private async descargarYGuardarAdjunto(
+    msg: WaWebhookMessage,
+    config: WaConfig,
+  ): Promise<{ url: string; tipo: string; nombre?: string } | null> {
+    const media = msg.image || msg.document || msg.audio
+    if (!media) return null
+
+    try {
+      const { buffer, mimeType } = await this.waService.descargarMedia(media.id, config)
+      const ext = this.extensionDesdeMime(mimeType, msg.type)
+      const filename = `${Date.now()}-${media.id}${ext}`
+      const dir = join(process.cwd(), 'uploads', 'whatsapp-adjuntos')
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
+      writeFileSync(join(dir, filename), buffer)
+
+      const appUrl = (this.configService.get<string>('APP_URL') || 'http://localhost:3001').replace(/\/$/, '')
+      return {
+        url: `${appUrl}/uploads/whatsapp-adjuntos/${filename}`,
+        tipo: msg.type,
+        nombre: msg.type === 'document' ? (msg.document?.filename || filename) : undefined,
+      }
+    } catch (err: any) {
+      this.logger.error(`[WA] No se pudo descargar adjunto (${media.id}): ${err.message}`)
+      return null
+    }
+  }
+
+  private extensionDesdeMime(mimeType: string, tipoMsg: string): string {
+    const base = (mimeType || '').split(';')[0].trim()
+    const mapa: Record<string, string> = {
+      'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp',
+      'application/pdf': '.pdf',
+      'audio/ogg': '.ogg', 'audio/mpeg': '.mp3', 'audio/amr': '.amr', 'audio/aac': '.aac',
+    }
+    return mapa[base] || (tipoMsg === 'document' ? '' : '.bin')
+  }
+
   private async encontrarOCrearConversacion(from: string, contactName: string, agenteId: string, clienteId: string) {
-    const existentes = await this.conversacionService.listar(clienteId, agenteId)
+    // Sin el filtro por agenteId: el historial de un contacto es continuo por
+    // número + canal, independiente de qué agente esté configurado en el canal
+    // en este momento. Filtrar por agenteId hacía que cada cambio de agente en
+    // Configuración (ej. de IA a humano y viceversa) creara una conversación
+    // nueva para el mismo contacto en vez de continuar la existente.
+    const existentes = await this.conversacionService.listar(clienteId)
     const delContacto = existentes.filter(c => c.contacto === from && c.canal === 'whatsapp')
 
     const abierta = delContacto.find(c => c.estadoConversacion !== 'resuelto' && c.estadoConversacion !== 'cerrado')
-    if (abierta) return abierta
+    if (abierta) {
+      if (abierta.agenteId !== agenteId) await this.conversacionService.actualizarAgente(abierta.id, agenteId)
+      return { ...abierta, agenteId }
+    }
 
     const cerrada = delContacto[0]
     if (cerrada) {
       await this.conversacionService.actualizarEstado(cerrada.id, 'abierto')
+      if (cerrada.agenteId !== agenteId) await this.conversacionService.actualizarAgente(cerrada.id, agenteId)
       this.logger.log(`[WA] Conversación ${cerrada.id} reabierta para ${from}`)
-      return { ...cerrada, estadoConversacion: 'abierto' }
+      return { ...cerrada, estadoConversacion: 'abierto', agenteId }
     }
 
     return this.conversacionService.crear(
@@ -194,7 +313,7 @@ export class WhatsappWebhookService {
     const apiKey = apiKeyConfig?.valor
     if (!apiKey || apiKey.includes('•')) {
       this.logger.error('[WA] ANTHROPIC_API_KEY no configurada para este cliente')
-      return { respuesta: null, textosPrevios: [], imagenes: [], documentos: [], audios: [], videos: [] }
+      return { respuesta: null, textosPrevios: [], imagenes: [], documentos: [], audios: [], videos: [], opciones: [], botonesLink: [], solicitudesUbicacion: [] }
     }
 
     // Construir system prompt: instrucciones del agente + base de conocimiento
@@ -232,6 +351,9 @@ export class WhatsappWebhookService {
     const pendingDocs: ToolDocumento[] = []
     const pendingAudios: string[] = []
     const pendingVideos: string[] = []
+    const pendingOpciones: ToolOpciones[] = []
+    const pendingBotonesLink: ToolBotonLink[] = []
+    const pendingSolicitudesUbicacion: ToolSolicitudUbicacion[] = []
     const textosPrevios: string[] = []
     const herramientasEjecutadas = new Set<string>()
     let reintentoConfirmacionForzado = false
@@ -304,7 +426,7 @@ export class WhatsappWebhookService {
             this.logger.error(`[WA] POSIBLE CITA FANTASMA: el agente ${agente.id} confirmó una cita en texto sin ejecutar agendar_cita (conversación ${conversacionId})`)
           }
 
-          return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos }
+          return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos, opciones: pendingOpciones, botonesLink: pendingBotonesLink, solicitudesUbicacion: pendingSolicitudesUbicacion }
         }
 
         if (stop_reason === 'tool_use') {
@@ -348,6 +470,18 @@ export class WhatsappWebhookService {
               pendingVideos.push(...resultado.videos)
             }
 
+            if (resultado.opciones) {
+              pendingOpciones.push(resultado.opciones)
+            }
+
+            if (resultado.botonLink) {
+              pendingBotonesLink.push(resultado.botonLink)
+            }
+
+            if (resultado.solicitudUbicacion) {
+              pendingSolicitudesUbicacion.push(resultado.solicitudUbicacion)
+            }
+
             toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultado.texto })
           }
 
@@ -356,14 +490,14 @@ export class WhatsappWebhookService {
         }
 
         const textBlock = (content as any[])?.find((b: any) => b.type === 'text')
-        return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos }
+        return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos, opciones: pendingOpciones, botonesLink: pendingBotonesLink, solicitudesUbicacion: pendingSolicitudesUbicacion }
       }
 
       this.logger.warn('[WA] Se alcanzó el límite de iteraciones de tool_use')
-      return { respuesta: null, textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos }
+      return { respuesta: null, textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos, opciones: pendingOpciones, botonesLink: pendingBotonesLink, solicitudesUbicacion: pendingSolicitudesUbicacion }
     } catch (err: any) {
       this.logger.error(`[WA] Error llamando a Claude: ${err?.response?.data?.error?.message || err.message}`)
-      return { respuesta: null, textosPrevios, imagenes: [], documentos: [], audios: [], videos: [] }
+      return { respuesta: null, textosPrevios, imagenes: [], documentos: [], audios: [], videos: [], opciones: [], botonesLink: [], solicitudesUbicacion: [] }
     }
   }
 

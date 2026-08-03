@@ -15,6 +15,9 @@ var WhatsappController_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WhatsappController = void 0;
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
+const multer_1 = require("multer");
+const path_1 = require("path");
 const jwt_auth_guard_1 = require("../../authentication/guards/jwt-auth.guard");
 const whatsapp_service_1 = require("../service/whatsapp.service");
 const whatsapp_webhook_service_1 = require("../service/whatsapp-webhook.service");
@@ -23,6 +26,13 @@ const red_social_service_1 = require("../../red-social/service/red-social.servic
 const configuracion_cliente_service_1 = require("../../cliente/service/configuracion-cliente.service");
 const whatsapp_dto_1 = require("../dto/whatsapp.dto");
 const success_response_dto_1 = require("../../../common/dto/success-response.dto");
+const adjuntosStorage = (0, multer_1.diskStorage)({
+    destination: (0, path_1.join)(process.cwd(), 'uploads', 'conversaciones'),
+    filename: (_req, file, cb) => {
+        const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+        cb(null, `${unique}${(0, path_1.extname)(file.originalname).toLowerCase()}`);
+    },
+});
 let WhatsappController = WhatsappController_1 = class WhatsappController {
     constructor(waService, webhookService, redSocialWebhookService, redSocialService, confClienteService) {
         this.waService = waService;
@@ -128,6 +138,27 @@ let WhatsappController = WhatsappController_1 = class WhatsappController {
         const result = await this.waService.enviarTexto(dto.celular, dto.mensaje, config);
         return new success_response_dto_1.SuccessResponseDto(result, 'Mensaje enviado');
     }
+    async subirAdjunto(file) {
+        if (!file)
+            throw new common_1.BadRequestException('No se recibió ningún archivo');
+        const appUrl = (process.env.APP_URL || 'http://localhost:3001').replace(/\/$/, '');
+        const tipo = file.mimetype.startsWith('image/') ? 'image' : file.mimetype.startsWith('audio/') ? 'audio' : 'document';
+        return new success_response_dto_1.SuccessResponseDto({
+            url: `${appUrl}/uploads/conversaciones/${file.filename}`,
+            tipo,
+            nombre: file.originalname,
+        });
+    }
+    async enviarAdjunto(dto, req) {
+        const config = await this.waService.obtenerConfig(this.clienteIdDe(req));
+        if (dto.tipo === 'image')
+            await this.waService.enviarImagen(dto.celular, dto.url, dto.caption || '', config);
+        else if (dto.tipo === 'audio')
+            await this.waService.enviarAudio(dto.celular, dto.url, config);
+        else
+            await this.waService.enviarDocumento(dto.celular, dto.url, dto.nombre || 'archivo', dto.caption || '', config);
+        return new success_response_dto_1.SuccessResponseDto(null, 'Adjunto enviado');
+    }
     clienteIdDe(req) {
         const deSesion = req.user?.clienteId;
         if (deSesion)
@@ -197,6 +228,24 @@ __decorate([
     __metadata("design:paramtypes", [whatsapp_dto_1.EnviarMensajeDto, Object]),
     __metadata("design:returntype", Promise)
 ], WhatsappController.prototype, "enviarMensaje", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.Post)('upload'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file', { storage: adjuntosStorage, limits: { fileSize: 25 * 1024 * 1024 } })),
+    __param(0, (0, common_1.UploadedFile)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", Promise)
+], WhatsappController.prototype, "subirAdjunto", null);
+__decorate([
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
+    (0, common_1.Post)('send-adjunto'),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [whatsapp_dto_1.EnviarAdjuntoDto, Object]),
+    __metadata("design:returntype", Promise)
+], WhatsappController.prototype, "enviarAdjunto", null);
 WhatsappController = WhatsappController_1 = __decorate([
     (0, common_1.Controller)('whatsapp'),
     __metadata("design:paramtypes", [whatsapp_service_1.WhatsappService,

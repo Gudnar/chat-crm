@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TestConexionDto = exports.EnviarMensajeDto = exports.WhatsappConfigDto = void 0;
+exports.TestConexionDto = exports.EnviarAdjuntoDto = exports.EnviarMensajeDto = exports.WhatsappConfigDto = void 0;
 const class_validator_1 = require("class-validator");
 class WhatsappConfigDto {
 }
@@ -55,6 +55,31 @@ __decorate([
     __metadata("design:type", String)
 ], EnviarMensajeDto.prototype, "mensaje", void 0);
 exports.EnviarMensajeDto = EnviarMensajeDto;
+class EnviarAdjuntoDto {
+}
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], EnviarAdjuntoDto.prototype, "celular", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], EnviarAdjuntoDto.prototype, "url", void 0);
+__decorate([
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], EnviarAdjuntoDto.prototype, "tipo", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], EnviarAdjuntoDto.prototype, "nombre", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], EnviarAdjuntoDto.prototype, "caption", void 0);
+exports.EnviarAdjuntoDto = EnviarAdjuntoDto;
 class TestConexionDto {
 }
 __decorate([

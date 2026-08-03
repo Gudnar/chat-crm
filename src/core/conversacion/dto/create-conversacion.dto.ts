@@ -1,4 +1,4 @@
-import { IsArray, IsNotEmpty, IsOptional, IsString } from 'class-validator'
+import { IsArray, IsBoolean, IsNotEmpty, IsObject, IsOptional, IsString } from 'class-validator'
 import { ApiProperty } from '@nestjs/swagger'
 
 export class CreateConversacionDto {
@@ -38,6 +38,31 @@ export class AgregarMensajeDto {
   @IsNotEmpty()
   @IsString()
   content: string
+
+  @ApiProperty({ required: false, description: 'Adjunto recibido/enviado (imagen, documento, audio)' })
+  @IsOptional()
+  @IsObject()
+  adjunto?: { url: string; tipo: string; nombre?: string }
+
+  @ApiProperty({ required: false, description: 'Pregunta con botones/lista enviada al cliente' })
+  @IsOptional()
+  @IsObject()
+  interactivo?: { pregunta: string; botones: Array<{ id: string; titulo: string }> }
+
+  @ApiProperty({ required: false, description: 'Botón con link externo enviado al cliente' })
+  @IsOptional()
+  @IsObject()
+  enlace?: { texto: string; url: string }
+
+  @ApiProperty({ required: false, description: 'Marca que este mensaje pidió la ubicación del cliente' })
+  @IsOptional()
+  @IsBoolean()
+  pidioUbicacion?: boolean
+
+  @ApiProperty({ required: false, description: 'Ubicación real compartida por el cliente' })
+  @IsOptional()
+  @IsObject()
+  ubicacion?: { latitud: number; longitud: number; nombre?: string; direccion?: string }
 }
 
 export class TestAgenteDto {

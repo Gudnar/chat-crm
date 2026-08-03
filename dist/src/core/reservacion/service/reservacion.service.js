@@ -23,6 +23,7 @@ const horario_agente_service_1 = require("./horario-agente.service");
 const agente_service_1 = require("../../agente/service/agente.service");
 const base_service_1 = require("../../../common/base/base-service");
 const constants_1 = require("../../../common/constants");
+const fecha_bolivia_util_1 = require("../../../common/lib/fecha-bolivia.util");
 let ReservacionService = ReservacionService_1 = class ReservacionService extends base_service_1.BaseService {
     constructor(reservaRepository, servicioAgenteService, horarioAgenteService, agenteService) {
         super(ReservacionService_1.name);
@@ -58,7 +59,7 @@ let ReservacionService = ReservacionService_1 = class ReservacionService extends
             duracionMinutos = servicio.duracionMinutos;
         }
         duracionMinutos = duracionMinutos || 30;
-        const fechaInicio = new Date(dto.fechaInicio);
+        const fechaInicio = (0, fecha_bolivia_util_1.fechaHoraBoliviaAUtc)(dto.fechaInicio);
         if (Number.isNaN(fechaInicio.getTime()))
             throw new common_1.BadRequestException('fechaInicio inválida');
         const fechaFin = new Date(fechaInicio.getTime() + duracionMinutos * 60000);
@@ -94,7 +95,7 @@ let ReservacionService = ReservacionService_1 = class ReservacionService extends
         let fechaInicio = reserva.fechaInicio;
         let duracionMinutos = dto.duracionMinutos ?? reserva.duracionMinutos;
         if (dto.fechaInicio) {
-            fechaInicio = new Date(dto.fechaInicio);
+            fechaInicio = (0, fecha_bolivia_util_1.fechaHoraBoliviaAUtc)(dto.fechaInicio);
             if (Number.isNaN(fechaInicio.getTime()))
                 throw new common_1.BadRequestException('fechaInicio inválida');
         }
@@ -198,13 +199,17 @@ let ReservacionService = ReservacionService_1 = class ReservacionService extends
     aFechaLocal(fecha, horaHHmm) {
         const [anio, mes, dia] = fecha.split('-').map(Number);
         const [h, m] = horaHHmm.split(':').map(Number);
-        return new Date(anio, mes - 1, dia, h, m, 0, 0);
+        return new Date(Date.UTC(anio, mes - 1, dia, h + 4, m, 0, 0));
     }
     aFechaYHoraLocal(fecha) {
-        const pad = (n) => String(n).padStart(2, '0');
+        const partes = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'America/La_Paz',
+            year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+        }).formatToParts(fecha);
+        const valor = (tipo) => partes.find(p => p.type === tipo)?.value ?? '00';
         return {
-            fecha: `${fecha.getFullYear()}-${pad(fecha.getMonth() + 1)}-${pad(fecha.getDate())}`,
-            hora: `${pad(fecha.getHours())}:${pad(fecha.getMinutes())}`,
+            fecha: `${valor('year')}-${valor('month')}-${valor('day')}`,
+            hora: `${valor('hour')}:${valor('minute')}`,
         };
     }
     async validarDentroDeHorario(agenteId, clienteId, fechaInicio, fechaFin) {

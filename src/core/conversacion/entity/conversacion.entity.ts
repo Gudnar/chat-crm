@@ -35,7 +35,16 @@ export class Conversacion extends AuditoriaEntity {
   score: number
 
   @Column({ name: 'mensajes', type: 'jsonb', default: '[]' })
-  mensajes: Array<{ role: string; content: string; timestamp: string }>
+  mensajes: Array<{
+    role: string
+    content: string
+    timestamp: string
+    adjunto?: { url: string; tipo: string; nombre?: string }
+    interactivo?: { pregunta: string; botones: Array<{ id: string; titulo: string }> }
+    enlace?: { texto: string; url: string }
+    pidioUbicacion?: boolean
+    ubicacion?: { latitud: number; longitud: number; nombre?: string; direccion?: string }
+  }>
 
   @Column({ name: 'total_mensajes', type: 'int', default: 0 })
   totalMensajes: number

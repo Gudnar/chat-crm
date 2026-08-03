@@ -70,11 +70,24 @@ let ConversacionService = ConversacionService_1 = class ConversacionService exte
             role: dto.role,
             content: dto.content,
             timestamp: new Date().toISOString(),
+            ...(dto.adjunto ? { adjunto: dto.adjunto } : {}),
+            ...(dto.interactivo ? { interactivo: dto.interactivo } : {}),
+            ...(dto.enlace ? { enlace: dto.enlace } : {}),
+            ...(dto.pidioUbicacion ? { pidioUbicacion: true } : {}),
+            ...(dto.ubicacion ? { ubicacion: dto.ubicacion } : {}),
         };
         conv.mensajes = [...(conv.mensajes || []), nuevoMensaje];
         conv.totalMensajes = conv.mensajes.length;
         conv.transaccion = constants_1.Transacccion.ACTUALIZAR;
         return this.conversacionRepository.save(conv);
+    }
+    async asignarAgenteHumano(id, agenteHumanoId) {
+        const conv = await this.obtener(id);
+        conv.agenteHumanoId = agenteHumanoId;
+        conv.tipoAgenteAsignado = constants_1.TipoAgente.HUMANO;
+        conv.fechaAsignacionHumano = new Date();
+        conv.transaccion = constants_1.Transacccion.ACTUALIZAR;
+        await this.conversacionRepository.save(conv);
     }
     async yaSeEnvioRecurso(id, recursoId) {
         const conv = await this.obtener(id);

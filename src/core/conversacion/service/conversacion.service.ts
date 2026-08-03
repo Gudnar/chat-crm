@@ -60,6 +60,11 @@ export class ConversacionService extends BaseService {
       role: dto.role,
       content: dto.content,
       timestamp: new Date().toISOString(),
+      ...(dto.adjunto ? { adjunto: dto.adjunto } : {}),
+      ...(dto.interactivo ? { interactivo: dto.interactivo } : {}),
+      ...(dto.enlace ? { enlace: dto.enlace } : {}),
+      ...(dto.pidioUbicacion ? { pidioUbicacion: true } : {}),
+      ...(dto.ubicacion ? { ubicacion: dto.ubicacion } : {}),
     }
     conv.mensajes = [...(conv.mensajes || []), nuevoMensaje]
     conv.totalMensajes = conv.mensajes.length

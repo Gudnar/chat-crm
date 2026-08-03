@@ -12,12 +12,30 @@ export interface ToolDocumento {
     url: string;
     filename: string;
 }
+export interface ToolOpciones {
+    pregunta: string;
+    botones: Array<{
+        id: string;
+        titulo: string;
+    }>;
+}
+export interface ToolBotonLink {
+    mensaje: string;
+    textoBoton: string;
+    url: string;
+}
+export interface ToolSolicitudUbicacion {
+    mensaje: string;
+}
 export interface ToolResult {
     texto: string;
     imagenes?: string[];
     documentos?: ToolDocumento[];
     audios?: string[];
     videos?: string[];
+    opciones?: ToolOpciones;
+    botonLink?: ToolBotonLink;
+    solicitudUbicacion?: ToolSolicitudUbicacion;
 }
 export declare class ToolExecutorService {
     private readonly conversacionService;
@@ -31,6 +49,9 @@ export declare class ToolExecutorService {
     private calificarLead;
     private cambiarEstado;
     private escalarAgente;
+    private preguntarOpciones;
+    private enviarBotonLink;
+    private solicitarUbicacion;
     private crearNota;
     private buscarProducto;
     private consultarDisponibilidad;

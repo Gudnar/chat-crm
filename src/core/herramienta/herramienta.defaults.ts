@@ -105,4 +105,43 @@ export const HERRAMIENTAS_DEFAULT: Partial<Herramienta>[] = [
     activa: true, autoConfirmar: true, confianzaMinima: 60, color: '#8b5cf6', icono: 'paperclip',
     ejemplo: 'enviar_recurso({ termino: "ficha tecnica" })',
   },
+  {
+    nombre: 'preguntar_opciones',
+    label: 'Preguntar con Opciones',
+    descripcion: 'Presenta al cliente una pregunta con botones táctiles para que elija en vez de escribir texto libre. Úsala cuando el cliente tenga que elegir entre 2 y 10 alternativas concretas (ej. "¿Opción 1 o Opción 2?", "¿Qué talla?", "¿Cuál sucursal?"). El cliente responde tocando un botón; su elección te llega como un mensaje normal con el texto exacto del botón que tocó — trátalo igual que si lo hubiera escrito.',
+    parametros: [
+      { nombre: 'pregunta', tipo: 'string', descripcion: 'La pregunta o mensaje que acompaña a los botones', requerido: true },
+      {
+        nombre: 'opciones', tipo: 'array', requerido: true,
+        descripcion: 'Entre 2 y 10 opciones. Si son 3 o menos se muestran como botones directos; si son más, como una lista desplegable.',
+        itemsPropiedades: [
+          { nombre: 'texto', tipo: 'string', descripcion: 'Texto de la opción (máx. 24 caracteres, WhatsApp lo recorta)', requerido: true },
+        ],
+      },
+    ] as any,
+    activa: true, autoConfirmar: true, confianzaMinima: 50, color: '#f59e0b', icono: 'list',
+    ejemplo: 'preguntar_opciones({ pregunta: "¿Qué talla prefieres?", opciones: [{texto:"S"},{texto:"M"},{texto:"L"}] })',
+  },
+  {
+    nombre: 'enviar_boton_link',
+    label: 'Enviar Botón con Link',
+    descripcion: 'Manda un mensaje con un botón nativo que abre un link externo (checkout, formulario, portafolio, etc.), en vez de pegar la URL como texto plano. Úsala cuando quieras que el cliente visite una página fuera de WhatsApp con una experiencia más confiable que un link suelto en el texto.',
+    parametros: [
+      { nombre: 'mensaje', tipo: 'string', descripcion: 'Texto que acompaña al botón', requerido: true },
+      { nombre: 'texto_boton', tipo: 'string', descripcion: 'Texto del botón (máx. 20 caracteres, ej. "Ver más", "Pagar ahora")', requerido: true },
+      { nombre: 'url', tipo: 'string', descripcion: 'URL completa (debe empezar con http:// o https://) a la que el botón lleva', requerido: true },
+    ] as any,
+    activa: true, autoConfirmar: true, confianzaMinima: 60, color: '#0ea5e9', icono: 'link',
+    ejemplo: 'enviar_boton_link({ mensaje: "Podés ver el catálogo completo acá:", texto_boton: "Ver catálogo", url: "https://misitio.com/catalogo" })',
+  },
+  {
+    nombre: 'solicitar_ubicacion',
+    label: 'Solicitar Ubicación',
+    descripcion: 'Le pide al cliente que comparta su ubicación real (GPS) con un botón nativo de WhatsApp, en vez de que la escriba a mano. Úsala para confirmar dirección de entrega o encontrar la sucursal más cercana. La ubicación que comparta llega con coordenadas reales, nunca la inventes.',
+    parametros: [
+      { nombre: 'mensaje', tipo: 'string', descripcion: 'Texto que explica por qué se pide la ubicación', requerido: true },
+    ] as any,
+    activa: true, autoConfirmar: true, confianzaMinima: 60, color: '#22c55e', icono: 'map-pin',
+    ejemplo: 'solicitar_ubicacion({ mensaje: "Para calcular el envío, ¿podrías compartir tu ubicación?" })',
+  },
 ]

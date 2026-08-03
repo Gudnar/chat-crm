@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import { WhatsappService } from './whatsapp.service';
 import { ConversacionService } from '../../conversacion/service/conversacion.service';
 import { AgenteService } from '../../agente/service/agente.service';
@@ -14,10 +15,15 @@ export declare class WhatsappWebhookService {
     private readonly herramientaService;
     private readonly toolExecutor;
     private readonly baseConocimientoService;
+    private readonly configService;
     private readonly logger;
-    constructor(waService: WhatsappService, conversacionService: ConversacionService, agenteService: AgenteService, confClienteService: ConfiguracionClienteService, herramientaService: HerramientaService, toolExecutor: ToolExecutorService, baseConocimientoService: BaseConocimientoService);
+    constructor(waService: WhatsappService, conversacionService: ConversacionService, agenteService: AgenteService, confClienteService: ConfiguracionClienteService, herramientaService: HerramientaService, toolExecutor: ToolExecutorService, baseConocimientoService: BaseConocimientoService, configService: ConfigService);
     procesarMensajeEntrante(rawMessage: WaWebhookMessage, contactName: string, phoneNumberId: string): Promise<void>;
     private extraerTexto;
+    private extraerUbicacion;
+    private esMensajeConAdjunto;
+    private descargarYGuardarAdjunto;
+    private extensionDesdeMime;
     private encontrarOCrearConversacion;
     private llamarClaude;
     private sanitizarRespuesta;

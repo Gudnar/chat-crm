@@ -59,6 +59,36 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], AgregarMensajeDto.prototype, "content", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false, description: 'Adjunto recibido/enviado (imagen, documento, audio)' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsObject)(),
+    __metadata("design:type", Object)
+], AgregarMensajeDto.prototype, "adjunto", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false, description: 'Pregunta con botones/lista enviada al cliente' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsObject)(),
+    __metadata("design:type", Object)
+], AgregarMensajeDto.prototype, "interactivo", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false, description: 'Botón con link externo enviado al cliente' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsObject)(),
+    __metadata("design:type", Object)
+], AgregarMensajeDto.prototype, "enlace", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false, description: 'Marca que este mensaje pidió la ubicación del cliente' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], AgregarMensajeDto.prototype, "pidioUbicacion", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false, description: 'Ubicación real compartida por el cliente' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsObject)(),
+    __metadata("design:type", Object)
+], AgregarMensajeDto.prototype, "ubicacion", void 0);
 exports.AgregarMensajeDto = AgregarMensajeDto;
 class TestAgenteDto {
 }

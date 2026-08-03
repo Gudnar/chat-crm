@@ -104,6 +104,22 @@ let HerramientaService = HerramientaService_1 = class HerramientaService extends
                     schema.maximum = param.maximo;
                 properties[param.nombre] = schema;
             }
+            else if (param.tipo === 'array') {
+                const itemProps = {};
+                const itemRequired = [];
+                for (const ip of param.itemsPropiedades ?? []) {
+                    itemProps[ip.nombre] = { type: ip.tipo, description: ip.descripcion };
+                    if (ip.requerido)
+                        itemRequired.push(ip.nombre);
+                }
+                properties[param.nombre] = {
+                    type: 'array',
+                    description: param.descripcion,
+                    items: Object.keys(itemProps).length
+                        ? { type: 'object', properties: itemProps, ...(itemRequired.length ? { required: itemRequired } : {}) }
+                        : { type: 'string' },
+                };
+            }
             else {
                 properties[param.nombre] = { type: param.tipo, description: param.descripcion };
             }

@@ -1,10 +1,11 @@
+/// <reference types="multer" />
 import { Response } from 'express';
 import { WhatsappService } from '../service/whatsapp.service';
 import { WhatsappWebhookService } from '../service/whatsapp-webhook.service';
 import { RedSocialWebhookService } from '../../red-social/service/red-social-webhook.service';
 import { RedSocialService } from '../../red-social/service/red-social.service';
 import { ConfiguracionClienteService } from '../../cliente/service/configuracion-cliente.service';
-import { WhatsappConfigDto, EnviarMensajeDto, TestConexionDto } from '../dto/whatsapp.dto';
+import { WhatsappConfigDto, EnviarMensajeDto, EnviarAdjuntoDto, TestConexionDto } from '../dto/whatsapp.dto';
 import { SuccessResponseDto } from '../../../common/dto/success-response.dto';
 export declare class WhatsappController {
     private readonly waService;
@@ -37,5 +38,7 @@ export declare class WhatsappController {
         mensaje: string;
     }>;
     enviarMensaje(dto: EnviarMensajeDto, req: any): Promise<SuccessResponseDto>;
+    subirAdjunto(file: Express.Multer.File): Promise<SuccessResponseDto>;
+    enviarAdjunto(dto: EnviarAdjuntoDto, req: any): Promise<SuccessResponseDto>;
     private clienteIdDe;
 }

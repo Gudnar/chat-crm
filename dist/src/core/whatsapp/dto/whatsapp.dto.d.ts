@@ -10,6 +10,13 @@ export declare class EnviarMensajeDto {
     celular: string;
     mensaje: string;
 }
+export declare class EnviarAdjuntoDto {
+    celular: string;
+    url: string;
+    tipo: string;
+    nombre?: string;
+    caption?: string;
+}
 export declare class TestConexionDto {
     accessToken: string;
     phoneNumberId: string;
@@ -41,6 +48,7 @@ export interface WaWebhookMessage {
         id: string;
         mime_type: string;
         sha256: string;
+        caption?: string;
     };
     audio?: {
         id: string;
@@ -50,6 +58,13 @@ export interface WaWebhookMessage {
         id: string;
         filename: string;
         mime_type: string;
+        caption?: string;
+    };
+    location?: {
+        latitude: number;
+        longitude: number;
+        name?: string;
+        address?: string;
     };
 }
 export interface WaContact {

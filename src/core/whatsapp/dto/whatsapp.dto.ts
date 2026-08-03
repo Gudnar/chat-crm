@@ -14,6 +14,14 @@ export class EnviarMensajeDto {
   @IsString() mensaje: string
 }
 
+export class EnviarAdjuntoDto {
+  @IsString() celular: string
+  @IsString() url: string
+  @IsString() tipo: string // 'image' | 'document' | 'audio'
+  @IsOptional() @IsString() nombre?: string
+  @IsOptional() @IsString() caption?: string
+}
+
 export class TestConexionDto {
   @IsString() accessToken:   string
   @IsString() phoneNumberId: string
@@ -28,9 +36,10 @@ export interface WaWebhookMessage {
   text?: { body: string }
   button?: { payload: string; text: string }
   interactive?: { type: string; button_reply?: { id: string; title: string }; list_reply?: { id: string; title: string } }
-  image?: { id: string; mime_type: string; sha256: string }
+  image?: { id: string; mime_type: string; sha256: string; caption?: string }
   audio?: { id: string; mime_type: string }
-  document?: { id: string; filename: string; mime_type: string }
+  document?: { id: string; filename: string; mime_type: string; caption?: string }
+  location?: { latitude: number; longitude: number; name?: string; address?: string }
 }
 
 export interface WaContact {

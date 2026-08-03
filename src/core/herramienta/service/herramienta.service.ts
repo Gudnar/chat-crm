@@ -112,6 +112,20 @@ export class HerramientaService extends BaseService {
         if (param.minimo !== undefined) schema.minimum = param.minimo
         if (param.maximo !== undefined) schema.maximum = param.maximo
         properties[param.nombre] = schema
+      } else if (param.tipo === 'array') {
+        const itemProps: Record<string, any> = {}
+        const itemRequired: string[] = []
+        for (const ip of param.itemsPropiedades ?? []) {
+          itemProps[ip.nombre] = { type: ip.tipo, description: ip.descripcion }
+          if (ip.requerido) itemRequired.push(ip.nombre)
+        }
+        properties[param.nombre] = {
+          type: 'array',
+          description: param.descripcion,
+          items: Object.keys(itemProps).length
+            ? { type: 'object', properties: itemProps, ...(itemRequired.length ? { required: itemRequired } : {}) }
+            : { type: 'string' },
+        }
       } else {
         properties[param.nombre] = { type: param.tipo, description: param.descripcion }
       }

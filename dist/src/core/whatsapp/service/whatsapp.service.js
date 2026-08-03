@@ -87,6 +87,20 @@ let WhatsappService = WhatsappService_1 = class WhatsappService {
             throw new Error(metaError?.message || err.message || 'Error enviando mensaje WhatsApp');
         }
     }
+    async descargarMedia(mediaId, config) {
+        const metaRes = await axios_1.default.get(`${WA_BASE_URL}/${mediaId}`, {
+            headers: { Authorization: `Bearer ${config.accessToken}` },
+        });
+        const mediaUrl = metaRes.data?.url;
+        const mimeType = metaRes.data?.mime_type || 'application/octet-stream';
+        if (!mediaUrl)
+            throw new Error('Meta no devolvió URL de descarga para el adjunto');
+        const fileRes = await axios_1.default.get(mediaUrl, {
+            headers: { Authorization: `Bearer ${config.accessToken}` },
+            responseType: 'arraybuffer',
+        });
+        return { buffer: Buffer.from(fileRes.data), mimeType };
+    }
     async enviarImagen(to, imageUrl, caption, config) {
         try {
             await this.apiPost(config.phoneNumberId, config.accessToken, {
@@ -149,6 +163,96 @@ let WhatsappService = WhatsappService_1 = class WhatsappService {
         catch (err) {
             const msg = err?.response?.data?.error?.message || err.message;
             this.logger.warn(`[WA] No se pudo enviar video (${videoUrl}): ${msg}`);
+        }
+    }
+    async enviarBotones(to, cuerpo, opciones, config) {
+        try {
+            await this.apiPost(config.phoneNumberId, config.accessToken, {
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: to.replace(/\D/g, ''),
+                type: 'interactive',
+                interactive: {
+                    type: 'button',
+                    body: { text: cuerpo },
+                    action: {
+                        buttons: opciones.slice(0, 3).map(o => ({
+                            type: 'reply',
+                            reply: { id: o.id, title: o.titulo.slice(0, 20) },
+                        })),
+                    },
+                },
+            });
+        }
+        catch (err) {
+            const msg = err?.response?.data?.error?.message || err.message;
+            this.logger.warn(`[WA] No se pudo enviar botones: ${msg}`);
+        }
+    }
+    async enviarLista(to, cuerpo, botonTexto, opciones, config) {
+        try {
+            await this.apiPost(config.phoneNumberId, config.accessToken, {
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: to.replace(/\D/g, ''),
+                type: 'interactive',
+                interactive: {
+                    type: 'list',
+                    body: { text: cuerpo },
+                    action: {
+                        button: botonTexto.slice(0, 20),
+                        sections: [{
+                                title: 'Opciones',
+                                rows: opciones.slice(0, 10).map(o => ({ id: o.id, title: o.titulo.slice(0, 24) })),
+                            }],
+                    },
+                },
+            });
+        }
+        catch (err) {
+            const msg = err?.response?.data?.error?.message || err.message;
+            this.logger.warn(`[WA] No se pudo enviar lista: ${msg}`);
+        }
+    }
+    async enviarBotonLink(to, cuerpo, textoBoton, url, config) {
+        try {
+            await this.apiPost(config.phoneNumberId, config.accessToken, {
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: to.replace(/\D/g, ''),
+                type: 'interactive',
+                interactive: {
+                    type: 'cta_url',
+                    body: { text: cuerpo },
+                    action: {
+                        name: 'cta_url',
+                        parameters: { display_text: textoBoton.slice(0, 20), url },
+                    },
+                },
+            });
+        }
+        catch (err) {
+            const msg = err?.response?.data?.error?.message || err.message;
+            this.logger.warn(`[WA] No se pudo enviar botón de link (${url}): ${msg}`);
+        }
+    }
+    async enviarSolicitudUbicacion(to, cuerpo, config) {
+        try {
+            await this.apiPost(config.phoneNumberId, config.accessToken, {
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: to.replace(/\D/g, ''),
+                type: 'interactive',
+                interactive: {
+                    type: 'location_request_message',
+                    body: { text: cuerpo },
+                    action: { name: 'send_location' },
+                },
+            });
+        }
+        catch (err) {
+            const msg = err?.response?.data?.error?.message || err.message;
+            this.logger.warn(`[WA] No se pudo enviar solicitud de ubicación: ${msg}`);
         }
     }
     async marcarLeido(messageId, config) {

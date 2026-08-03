@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { ConfiguracionClienteService } from '../../cliente/service/configuracion-cliente.service';
 export interface WaConfig {
     accessToken: string;
@@ -15,10 +16,24 @@ export declare class WhatsappService {
     guardarConfig(clienteId: string, data: Partial<WaConfig>, usuarioId: string): Promise<void>;
     private apiPost;
     enviarTexto(to: string, text: string, config: WaConfig): Promise<any>;
+    descargarMedia(mediaId: string, config: WaConfig): Promise<{
+        buffer: Buffer;
+        mimeType: string;
+    }>;
     enviarImagen(to: string, imageUrl: string, caption: string, config: WaConfig): Promise<void>;
     enviarDocumento(to: string, documentUrl: string, filename: string, caption: string, config: WaConfig): Promise<void>;
     enviarAudio(to: string, audioUrl: string, config: WaConfig): Promise<void>;
     enviarVideo(to: string, videoUrl: string, caption: string, config: WaConfig): Promise<void>;
+    enviarBotones(to: string, cuerpo: string, opciones: Array<{
+        id: string;
+        titulo: string;
+    }>, config: WaConfig): Promise<void>;
+    enviarLista(to: string, cuerpo: string, botonTexto: string, opciones: Array<{
+        id: string;
+        titulo: string;
+    }>, config: WaConfig): Promise<void>;
+    enviarBotonLink(to: string, cuerpo: string, textoBoton: string, url: string, config: WaConfig): Promise<void>;
+    enviarSolicitudUbicacion(to: string, cuerpo: string, config: WaConfig): Promise<void>;
     marcarLeido(messageId: string, config: WaConfig): Promise<void>;
     mostrarTyping(messageId: string, config: WaConfig): Promise<void>;
     testConexion(accessToken: string, phoneNumberId: string): Promise<{

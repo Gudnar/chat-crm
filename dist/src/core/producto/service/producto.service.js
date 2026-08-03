@@ -184,10 +184,11 @@ let ProductoService = ProductoService_1 = class ProductoService extends base_ser
     describirDisponibilidad(p) {
         if (p.fechaDisponibilidad) {
             const disponibleDesde = new Date(p.fechaDisponibilidad);
-            const hoy = new Date();
-            hoy.setHours(0, 0, 0, 0);
+            const hoyBolivia = new Date().toLocaleDateString('en-CA', { timeZone: 'America/La_Paz' });
+            const [anio, mes, dia] = hoyBolivia.split('-').map(Number);
+            const hoy = new Date(Date.UTC(anio, mes - 1, dia));
             if (disponibleDesde > hoy) {
-                const fechaLegible = disponibleDesde.toLocaleDateString('es-BO', { day: 'numeric', month: 'long', year: 'numeric' });
+                const fechaLegible = disponibleDesde.toLocaleDateString('es-BO', { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' });
                 return `Aún NO disponible — llega el ${fechaLegible}. No lo ofrezcas como disponible ahora; dile al cliente que estará disponible pronto / que recién llega esa fecha.`;
             }
         }

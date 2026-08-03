@@ -20,12 +20,30 @@ export interface ToolDocumento {
   filename: string
 }
 
+export interface ToolOpciones {
+  pregunta: string
+  botones: Array<{ id: string; titulo: string }>
+}
+
+export interface ToolBotonLink {
+  mensaje: string
+  textoBoton: string
+  url: string
+}
+
+export interface ToolSolicitudUbicacion {
+  mensaje: string
+}
+
 export interface ToolResult {
   texto: string
   imagenes?: string[]
   documentos?: ToolDocumento[]
   audios?: string[]
   videos?: string[]
+  opciones?: ToolOpciones
+  botonLink?: ToolBotonLink
+  solicitudUbicacion?: ToolSolicitudUbicacion
 }
 
 @Injectable()
@@ -54,6 +72,9 @@ export class ToolExecutorService {
         case 'enviar_recurso':   return await this.enviarRecurso(input, contexto)
         case 'agendar_cita':     return await this.agendarCita(input, contexto)
         case 'consultar_disponibilidad': return await this.consultarDisponibilidad(input, contexto)
+        case 'preguntar_opciones': return await this.preguntarOpciones(input, contexto)
+        case 'enviar_boton_link': return await this.enviarBotonLink(input, contexto)
+        case 'solicitar_ubicacion': return await this.solicitarUbicacion(input, contexto)
         default:
           this.logger.warn(`[Tool] Herramienta desconocida: ${nombre}`)
           return { texto: `Herramienta "${nombre}" no está implementada.` }
@@ -78,6 +99,57 @@ export class ToolExecutorService {
   private async escalarAgente(input: any, ctx: ToolContexto): Promise<ToolResult> {
     await this.conversacionService.escalar(ctx.conversacionId, input.razon)
     return { texto: `Conversación escalada a agente humano. Razón: ${input.razon}. Prioridad: ${input.prioridad ?? 'media'}` }
+  }
+
+  private async preguntarOpciones(input: any, _ctx: ToolContexto): Promise<ToolResult> {
+    const pregunta = String(input?.pregunta || '').trim()
+    const opcionesInput = Array.isArray(input?.opciones) ? input.opciones : []
+
+    if (!pregunta || opcionesInput.length < 2) {
+      return { texto: '[Sistema: preguntar_opciones necesita una pregunta y al menos 2 opciones. No se envió nada.]' }
+    }
+    if (opcionesInput.length > 10) {
+      return { texto: '[Sistema: máximo 10 opciones — es el límite de WhatsApp. Reduce la lista.]' }
+    }
+
+    const botones = opcionesInput.slice(0, 10).map((o: any, i: number) => ({
+      id: `op_${i + 1}`,
+      titulo: String(o?.texto || '').trim().slice(0, 24) || `Opción ${i + 1}`,
+    }))
+
+    return {
+      texto: `[Sistema: se le presentaron ${botones.length} opciones al cliente (${botones.map(b => b.titulo).join(', ')}). Espera a que elija tocando un botón antes de continuar — no asumas ni inventes cuál seleccionó.]`,
+      opciones: { pregunta, botones },
+    }
+  }
+
+  private async enviarBotonLink(input: any, _ctx: ToolContexto): Promise<ToolResult> {
+    const mensaje = String(input?.mensaje || '').trim()
+    const textoBoton = String(input?.texto_boton || '').trim()
+    const url = String(input?.url || '').trim()
+
+    if (!mensaje || !textoBoton || !url) {
+      return { texto: '[Sistema: enviar_boton_link necesita mensaje, texto_boton y url. No se envió nada.]' }
+    }
+    if (!/^https?:\/\//i.test(url)) {
+      return { texto: '[Sistema: la url debe empezar con http:// o https://. No se envió nada.]' }
+    }
+
+    return {
+      texto: `[Sistema: se le mandó al cliente un botón "${textoBoton}" que lleva a ${url}.]`,
+      botonLink: { mensaje, textoBoton: textoBoton.slice(0, 20), url },
+    }
+  }
+
+  private async solicitarUbicacion(input: any, _ctx: ToolContexto): Promise<ToolResult> {
+    const mensaje = String(input?.mensaje || '').trim()
+    if (!mensaje) {
+      return { texto: '[Sistema: solicitar_ubicacion necesita un mensaje. No se envió nada.]' }
+    }
+    return {
+      texto: '[Sistema: se le pidió al cliente que comparta su ubicación con el botón nativo de WhatsApp. Espera a que la mande — no inventes ni asumas dónde está.]',
+      solicitudUbicacion: { mensaje },
+    }
   }
 
   private async crearNota(input: any, ctx: ToolContexto): Promise<ToolResult> {

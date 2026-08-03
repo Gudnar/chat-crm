@@ -1,13 +1,24 @@
-import { BadRequestException, Body, Controller, Get, Post, Query, Res, UseGuards, Request, HttpCode, Logger } from '@nestjs/common'
+import { BadRequestException, Body, Controller, Get, Post, Query, Res, UseGuards, UseInterceptors, UploadedFile, Request, HttpCode, Logger } from '@nestjs/common'
+import { FileInterceptor } from '@nestjs/platform-express'
 import { Response } from 'express'
+import { diskStorage } from 'multer'
+import { extname, join } from 'path'
 import { JwtAuthGuard } from '../../authentication/guards/jwt-auth.guard'
 import { WhatsappService } from '../service/whatsapp.service'
 import { WhatsappWebhookService } from '../service/whatsapp-webhook.service'
 import { RedSocialWebhookService } from '../../red-social/service/red-social-webhook.service'
 import { RedSocialService } from '../../red-social/service/red-social.service'
 import { ConfiguracionClienteService } from '../../cliente/service/configuracion-cliente.service'
-import { WhatsappConfigDto, EnviarMensajeDto, TestConexionDto, WaWebhookMessage, WaContact } from '../dto/whatsapp.dto'
+import { WhatsappConfigDto, EnviarMensajeDto, EnviarAdjuntoDto, TestConexionDto, WaWebhookMessage, WaContact } from '../dto/whatsapp.dto'
 import { SuccessResponseDto } from '../../../common/dto/success-response.dto'
+
+const adjuntosStorage = diskStorage({
+  destination: join(process.cwd(), 'uploads', 'conversaciones'),
+  filename: (_req, file, cb) => {
+    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`
+    cb(null, `${unique}${extname(file.originalname).toLowerCase()}`)
+  },
+})
 
 @Controller('whatsapp')
 export class WhatsappController {
@@ -146,6 +157,32 @@ export class WhatsappController {
     const config = await this.waService.obtenerConfig(this.clienteIdDe(req))
     const result = await this.waService.enviarTexto(dto.celular, dto.mensaje, config)
     return new SuccessResponseDto(result, 'Mensaje enviado')
+  }
+
+  /** Sube un adjunto (imagen/documento/audio) desde el panel para mandarlo manualmente por WhatsApp. */
+  @UseGuards(JwtAuthGuard)
+  @Post('upload')
+  @UseInterceptors(FileInterceptor('file', { storage: adjuntosStorage, limits: { fileSize: 25 * 1024 * 1024 } }))
+  async subirAdjunto(@UploadedFile() file: Express.Multer.File) {
+    if (!file) throw new BadRequestException('No se recibió ningún archivo')
+    const appUrl = (process.env.APP_URL || 'http://localhost:3001').replace(/\/$/, '')
+    const tipo = file.mimetype.startsWith('image/') ? 'image' : file.mimetype.startsWith('audio/') ? 'audio' : 'document'
+    return new SuccessResponseDto({
+      url: `${appUrl}/uploads/conversaciones/${file.filename}`,
+      tipo,
+      nombre: file.originalname,
+    })
+  }
+
+  /** Manda un adjunto ya subido al número indicado (imagen/documento/audio). */
+  @UseGuards(JwtAuthGuard)
+  @Post('send-adjunto')
+  async enviarAdjunto(@Body() dto: EnviarAdjuntoDto, @Request() req: any) {
+    const config = await this.waService.obtenerConfig(this.clienteIdDe(req))
+    if (dto.tipo === 'image') await this.waService.enviarImagen(dto.celular, dto.url, dto.caption || '', config)
+    else if (dto.tipo === 'audio') await this.waService.enviarAudio(dto.celular, dto.url, config)
+    else await this.waService.enviarDocumento(dto.celular, dto.url, dto.nombre || 'archivo', dto.caption || '', config)
+    return new SuccessResponseDto(null, 'Adjunto enviado')
   }
 
   /**

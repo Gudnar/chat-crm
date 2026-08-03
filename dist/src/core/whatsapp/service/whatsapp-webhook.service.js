@@ -15,7 +15,10 @@ var WhatsappWebhookService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WhatsappWebhookService = void 0;
 const common_1 = require("@nestjs/common");
+const config_1 = require("@nestjs/config");
 const axios_1 = __importDefault(require("axios"));
+const fs_1 = require("fs");
+const path_1 = require("path");
 const whatsapp_service_1 = require("./whatsapp.service");
 const conversacion_service_1 = require("../../conversacion/service/conversacion.service");
 const agente_service_1 = require("../../agente/service/agente.service");
@@ -28,7 +31,7 @@ const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_TOOL_ITERATIONS = 5;
 let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookService {
-    constructor(waService, conversacionService, agenteService, confClienteService, herramientaService, toolExecutor, baseConocimientoService) {
+    constructor(waService, conversacionService, agenteService, confClienteService, herramientaService, toolExecutor, baseConocimientoService, configService) {
         this.waService = waService;
         this.conversacionService = conversacionService;
         this.agenteService = agenteService;
@@ -36,6 +39,7 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
         this.herramientaService = herramientaService;
         this.toolExecutor = toolExecutor;
         this.baseConocimientoService = baseConocimientoService;
+        this.configService = configService;
         this.logger = new common_1.Logger(WhatsappWebhookService_1.name);
     }
     async procesarMensajeEntrante(rawMessage, contactName, phoneNumberId) {
@@ -69,12 +73,22 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
                 return;
             }
             const conversacion = await this.encontrarOCrearConversacion(from, contactName, agente.id, clienteId);
-            await this.conversacionService.agregarMensaje(conversacion.id, { role: 'user', content: textoUsuario });
+            let adjunto;
+            if (this.esMensajeConAdjunto(rawMessage)) {
+                adjunto = (await this.descargarYGuardarAdjunto(rawMessage, config)) ?? undefined;
+            }
+            const ubicacion = this.extraerUbicacion(rawMessage);
+            await this.conversacionService.agregarMensaje(conversacion.id, { role: 'user', content: textoUsuario, adjunto, ubicacion });
+            if (agente.tipoAgente === constants_1.TipoAgente.HUMANO) {
+                await this.conversacionService.asignarAgenteHumano(conversacion.id, agente.id);
+                this.logger.log(`[WA] Mensaje de ${from} guardado para el agente humano ${agente.nombre} — sin respuesta automática`);
+                return;
+            }
             const convActualizada = await this.conversacionService.obtener(conversacion.id);
             const historial = (convActualizada.mensajes || [])
                 .slice(-MAX_HISTORY_MESSAGES)
                 .map(m => ({ role: m.role, content: m.content }));
-            const { respuesta, textosPrevios, imagenes, documentos, audios, videos } = await this.llamarClaude(agente, historial, clienteId, conversacion.id);
+            const { respuesta, textosPrevios, imagenes, documentos, audios, videos, opciones, botonesLink, solicitudesUbicacion } = await this.llamarClaude(agente, historial, clienteId, conversacion.id);
             if (!respuesta && textosPrevios.length === 0)
                 return;
             for (const texto of textosPrevios) {
@@ -98,7 +112,36 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
             for (const videoUrl of videos) {
                 await this.waService.enviarVideo(from, videoUrl, '', config);
             }
-            this.logger.log(`[WA] Respuesta enviada a ${from} (${imagenes.length} imágenes, ${documentos.length} documentos, ${audios.length} audios, ${videos.length} videos)`);
+            for (const pregunta of opciones) {
+                if (pregunta.botones.length <= 3) {
+                    await this.waService.enviarBotones(from, pregunta.pregunta, pregunta.botones, config);
+                }
+                else {
+                    await this.waService.enviarLista(from, pregunta.pregunta, 'Ver opciones', pregunta.botones, config);
+                }
+                await this.conversacionService.agregarMensaje(conversacion.id, {
+                    role: 'assistant',
+                    content: pregunta.pregunta,
+                    interactivo: pregunta,
+                });
+            }
+            for (const link of botonesLink) {
+                await this.waService.enviarBotonLink(from, link.mensaje, link.textoBoton, link.url, config);
+                await this.conversacionService.agregarMensaje(conversacion.id, {
+                    role: 'assistant',
+                    content: link.mensaje,
+                    enlace: { texto: link.textoBoton, url: link.url },
+                });
+            }
+            for (const solicitud of solicitudesUbicacion) {
+                await this.waService.enviarSolicitudUbicacion(from, solicitud.mensaje, config);
+                await this.conversacionService.agregarMensaje(conversacion.id, {
+                    role: 'assistant',
+                    content: solicitud.mensaje,
+                    pidioUbicacion: true,
+                });
+            }
+            this.logger.log(`[WA] Respuesta enviada a ${from} (${imagenes.length} imágenes, ${documentos.length} documentos, ${audios.length} audios, ${videos.length} videos, ${opciones.length} preguntas con opciones, ${botonesLink.length} botones link, ${solicitudesUbicacion.length} solicitudes de ubicación)`);
         }
         catch (err) {
             this.logger.error(`[WA] Error procesando mensaje de ${from}: ${err.message}`);
@@ -112,19 +155,80 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
         if (msg.type === 'interactive') {
             return msg.interactive?.button_reply?.title || msg.interactive?.list_reply?.title || null;
         }
+        if (msg.type === 'image')
+            return msg.image?.caption || '[Imagen adjunta]';
+        if (msg.type === 'document')
+            return msg.document?.caption || `[Documento adjunto: ${msg.document?.filename || 'archivo'}]`;
+        if (msg.type === 'audio')
+            return '[Nota de voz / audio adjunto]';
+        if (msg.type === 'location' && msg.location) {
+            const { latitude, longitude, name } = msg.location;
+            return `[Ubicación compartida: ${latitude}, ${longitude}${name ? ` — ${name}` : ''}]`;
+        }
         return null;
     }
+    extraerUbicacion(msg) {
+        if (msg.type !== 'location' || !msg.location)
+            return undefined;
+        return {
+            latitud: msg.location.latitude,
+            longitud: msg.location.longitude,
+            nombre: msg.location.name,
+            direccion: msg.location.address,
+        };
+    }
+    esMensajeConAdjunto(msg) {
+        return msg.type === 'image' || msg.type === 'document' || msg.type === 'audio';
+    }
+    async descargarYGuardarAdjunto(msg, config) {
+        const media = msg.image || msg.document || msg.audio;
+        if (!media)
+            return null;
+        try {
+            const { buffer, mimeType } = await this.waService.descargarMedia(media.id, config);
+            const ext = this.extensionDesdeMime(mimeType, msg.type);
+            const filename = `${Date.now()}-${media.id}${ext}`;
+            const dir = (0, path_1.join)(process.cwd(), 'uploads', 'whatsapp-adjuntos');
+            if (!(0, fs_1.existsSync)(dir))
+                (0, fs_1.mkdirSync)(dir, { recursive: true });
+            (0, fs_1.writeFileSync)((0, path_1.join)(dir, filename), buffer);
+            const appUrl = (this.configService.get('APP_URL') || 'http://localhost:3001').replace(/\/$/, '');
+            return {
+                url: `${appUrl}/uploads/whatsapp-adjuntos/${filename}`,
+                tipo: msg.type,
+                nombre: msg.type === 'document' ? (msg.document?.filename || filename) : undefined,
+            };
+        }
+        catch (err) {
+            this.logger.error(`[WA] No se pudo descargar adjunto (${media.id}): ${err.message}`);
+            return null;
+        }
+    }
+    extensionDesdeMime(mimeType, tipoMsg) {
+        const base = (mimeType || '').split(';')[0].trim();
+        const mapa = {
+            'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp',
+            'application/pdf': '.pdf',
+            'audio/ogg': '.ogg', 'audio/mpeg': '.mp3', 'audio/amr': '.amr', 'audio/aac': '.aac',
+        };
+        return mapa[base] || (tipoMsg === 'document' ? '' : '.bin');
+    }
     async encontrarOCrearConversacion(from, contactName, agenteId, clienteId) {
-        const existentes = await this.conversacionService.listar(clienteId, agenteId);
+        const existentes = await this.conversacionService.listar(clienteId);
         const delContacto = existentes.filter(c => c.contacto === from && c.canal === 'whatsapp');
         const abierta = delContacto.find(c => c.estadoConversacion !== 'resuelto' && c.estadoConversacion !== 'cerrado');
-        if (abierta)
-            return abierta;
+        if (abierta) {
+            if (abierta.agenteId !== agenteId)
+                await this.conversacionService.actualizarAgente(abierta.id, agenteId);
+            return { ...abierta, agenteId };
+        }
         const cerrada = delContacto[0];
         if (cerrada) {
             await this.conversacionService.actualizarEstado(cerrada.id, 'abierto');
+            if (cerrada.agenteId !== agenteId)
+                await this.conversacionService.actualizarAgente(cerrada.id, agenteId);
             this.logger.log(`[WA] Conversación ${cerrada.id} reabierta para ${from}`);
-            return { ...cerrada, estadoConversacion: 'abierto' };
+            return { ...cerrada, estadoConversacion: 'abierto', agenteId };
         }
         return this.conversacionService.crear({
             agenteId,
@@ -139,11 +243,12 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
         const apiKey = apiKeyConfig?.valor;
         if (!apiKey || apiKey.includes('•')) {
             this.logger.error('[WA] ANTHROPIC_API_KEY no configurada para este cliente');
-            return { respuesta: null, textosPrevios: [], imagenes: [], documentos: [], audios: [], videos: [] };
+            return { respuesta: null, textosPrevios: [], imagenes: [], documentos: [], audios: [], videos: [], opciones: [], botonesLink: [], solicitudesUbicacion: [] };
         }
         const instrucciones = agente.systemPrompt ||
             `Eres ${agente.nombre}, un asistente IA ${agente.tono || 'profesional'}. Responde en ${agente.idioma || 'español'} de forma concisa y útil.`;
         const fechaActual = `[Fecha y hora actual: ${new Date().toLocaleString('es-BO', {
+            timeZone: 'America/La_Paz',
             weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
         })}]`;
         const faqContexto = await this.baseConocimientoService.construirContexto(agente.id);
@@ -162,6 +267,9 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
         const pendingDocs = [];
         const pendingAudios = [];
         const pendingVideos = [];
+        const pendingOpciones = [];
+        const pendingBotonesLink = [];
+        const pendingSolicitudesUbicacion = [];
         const textosPrevios = [];
         const herramientasEjecutadas = new Set();
         let reintentoConfirmacionForzado = false;
@@ -216,7 +324,7 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
                     if (pareceConfirmarCita && tieneAgendarCita && !herramientasEjecutadas.has('agendar_cita')) {
                         this.logger.error(`[WA] POSIBLE CITA FANTASMA: el agente ${agente.id} confirmó una cita en texto sin ejecutar agendar_cita (conversación ${conversacionId})`);
                     }
-                    return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos };
+                    return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos, opciones: pendingOpciones, botonesLink: pendingBotonesLink, solicitudesUbicacion: pendingSolicitudesUbicacion };
                 }
                 if (stop_reason === 'tool_use') {
                     messages.push({ role: 'assistant', content });
@@ -246,20 +354,29 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
                         if (resultado.videos?.length) {
                             pendingVideos.push(...resultado.videos);
                         }
+                        if (resultado.opciones) {
+                            pendingOpciones.push(resultado.opciones);
+                        }
+                        if (resultado.botonLink) {
+                            pendingBotonesLink.push(resultado.botonLink);
+                        }
+                        if (resultado.solicitudUbicacion) {
+                            pendingSolicitudesUbicacion.push(resultado.solicitudUbicacion);
+                        }
                         toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultado.texto });
                     }
                     messages.push({ role: 'user', content: toolResults });
                     continue;
                 }
                 const textBlock = content?.find((b) => b.type === 'text');
-                return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos };
+                return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos, opciones: pendingOpciones, botonesLink: pendingBotonesLink, solicitudesUbicacion: pendingSolicitudesUbicacion };
             }
             this.logger.warn('[WA] Se alcanzó el límite de iteraciones de tool_use');
-            return { respuesta: null, textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos };
+            return { respuesta: null, textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos, opciones: pendingOpciones, botonesLink: pendingBotonesLink, solicitudesUbicacion: pendingSolicitudesUbicacion };
         }
         catch (err) {
             this.logger.error(`[WA] Error llamando a Claude: ${err?.response?.data?.error?.message || err.message}`);
-            return { respuesta: null, textosPrevios, imagenes: [], documentos: [], audios: [], videos: [] };
+            return { respuesta: null, textosPrevios, imagenes: [], documentos: [], audios: [], videos: [], opciones: [], botonesLink: [], solicitudesUbicacion: [] };
         }
     }
     sanitizarRespuesta(texto, tools) {
@@ -291,7 +408,8 @@ WhatsappWebhookService = WhatsappWebhookService_1 = __decorate([
         configuracion_cliente_service_1.ConfiguracionClienteService,
         herramienta_service_1.HerramientaService,
         tool_executor_service_1.ToolExecutorService,
-        base_conocimiento_service_1.BaseConocimientoService])
+        base_conocimiento_service_1.BaseConocimientoService,
+        config_1.ConfigService])
 ], WhatsappWebhookService);
 exports.WhatsappWebhookService = WhatsappWebhookService;
 //# sourceMappingURL=whatsapp-webhook.service.js.map

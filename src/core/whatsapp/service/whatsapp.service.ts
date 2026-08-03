@@ -90,6 +90,26 @@ export class WhatsappService {
     }
   }
 
+  /**
+   * Descarga un adjunto que un cliente envió por WhatsApp. Meta requiere 2 pasos:
+   * 1) resolver el media_id a una URL temporal de descarga, 2) bajar el archivo
+   * de esa URL — ambos pasos necesitan el access token en el header.
+   */
+  async descargarMedia(mediaId: string, config: WaConfig): Promise<{ buffer: Buffer; mimeType: string }> {
+    const metaRes = await axios.get(`${WA_BASE_URL}/${mediaId}`, {
+      headers: { Authorization: `Bearer ${config.accessToken}` },
+    })
+    const mediaUrl = metaRes.data?.url
+    const mimeType = metaRes.data?.mime_type || 'application/octet-stream'
+    if (!mediaUrl) throw new Error('Meta no devolvió URL de descarga para el adjunto')
+
+    const fileRes = await axios.get(mediaUrl, {
+      headers: { Authorization: `Bearer ${config.accessToken}` },
+      responseType: 'arraybuffer',
+    })
+    return { buffer: Buffer.from(fileRes.data), mimeType }
+  }
+
   async enviarImagen(to: string, imageUrl: string, caption: string, config: WaConfig): Promise<void> {
     try {
       await this.apiPost(config.phoneNumberId, config.accessToken, {
@@ -157,6 +177,104 @@ export class WhatsappService {
     } catch (err: any) {
       const msg = err?.response?.data?.error?.message || err.message
       this.logger.warn(`[WA] No se pudo enviar video (${videoUrl}): ${msg}`)
+    }
+  }
+
+  /**
+   * Botones de respuesta rápida (hasta 3). El título de cada botón se recorta a 20
+   * caracteres — es el límite duro de Meta, mandar más largo hace que la API rechace
+   * todo el mensaje.
+   */
+  async enviarBotones(to: string, cuerpo: string, opciones: Array<{ id: string; titulo: string }>, config: WaConfig): Promise<void> {
+    try {
+      await this.apiPost(config.phoneNumberId, config.accessToken, {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: to.replace(/\D/g, ''),
+        type: 'interactive',
+        interactive: {
+          type: 'button',
+          body: { text: cuerpo },
+          action: {
+            buttons: opciones.slice(0, 3).map(o => ({
+              type: 'reply',
+              reply: { id: o.id, title: o.titulo.slice(0, 20) },
+            })),
+          },
+        },
+      })
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err.message
+      this.logger.warn(`[WA] No se pudo enviar botones: ${msg}`)
+    }
+  }
+
+  /** Lista desplegable (hasta 10 opciones) — para cuando preguntar_opciones trae más de 3. */
+  async enviarLista(to: string, cuerpo: string, botonTexto: string, opciones: Array<{ id: string; titulo: string }>, config: WaConfig): Promise<void> {
+    try {
+      await this.apiPost(config.phoneNumberId, config.accessToken, {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: to.replace(/\D/g, ''),
+        type: 'interactive',
+        interactive: {
+          type: 'list',
+          body: { text: cuerpo },
+          action: {
+            button: botonTexto.slice(0, 20),
+            sections: [{
+              title: 'Opciones',
+              rows: opciones.slice(0, 10).map(o => ({ id: o.id, title: o.titulo.slice(0, 24) })),
+            }],
+          },
+        },
+      })
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err.message
+      this.logger.warn(`[WA] No se pudo enviar lista: ${msg}`)
+    }
+  }
+
+  /** Botón nativo que abre una URL externa — más confiable que pegar el link como texto plano. */
+  async enviarBotonLink(to: string, cuerpo: string, textoBoton: string, url: string, config: WaConfig): Promise<void> {
+    try {
+      await this.apiPost(config.phoneNumberId, config.accessToken, {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: to.replace(/\D/g, ''),
+        type: 'interactive',
+        interactive: {
+          type: 'cta_url',
+          body: { text: cuerpo },
+          action: {
+            name: 'cta_url',
+            parameters: { display_text: textoBoton.slice(0, 20), url },
+          },
+        },
+      })
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err.message
+      this.logger.warn(`[WA] No se pudo enviar botón de link (${url}): ${msg}`)
+    }
+  }
+
+  /** Pide la ubicación real (GPS) del cliente con un botón nativo — la respuesta llega como mensaje type=location. */
+  async enviarSolicitudUbicacion(to: string, cuerpo: string, config: WaConfig): Promise<void> {
+    try {
+      await this.apiPost(config.phoneNumberId, config.accessToken, {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: to.replace(/\D/g, ''),
+        type: 'interactive',
+        interactive: {
+          type: 'location_request_message',
+          body: { text: cuerpo },
+          action: { name: 'send_location' },
+        },
+      })
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err.message
+      this.logger.warn(`[WA] No se pudo enviar solicitud de ubicación: ${msg}`)
     }
   }
 
