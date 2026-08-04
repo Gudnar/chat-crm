@@ -64,5 +64,11 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateCampanaDto.prototype, "canalObjetivo", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: 'Plantilla aprobada a usar con contactos fuera de la ventana de 24h' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateCampanaDto.prototype, "plantillaId", void 0);
 exports.CreateCampanaDto = CreateCampanaDto;
 //# sourceMappingURL=campana.dto.js.map

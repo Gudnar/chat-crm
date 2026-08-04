@@ -24,6 +24,7 @@ const whatsapp_webhook_service_1 = require("../service/whatsapp-webhook.service"
 const red_social_webhook_service_1 = require("../../red-social/service/red-social-webhook.service");
 const red_social_service_1 = require("../../red-social/service/red-social.service");
 const configuracion_cliente_service_1 = require("../../cliente/service/configuracion-cliente.service");
+const plantilla_whatsapp_service_1 = require("../service/plantilla-whatsapp.service");
 const whatsapp_dto_1 = require("../dto/whatsapp.dto");
 const success_response_dto_1 = require("../../../common/dto/success-response.dto");
 const adjuntosStorage = (0, multer_1.diskStorage)({
@@ -34,12 +35,13 @@ const adjuntosStorage = (0, multer_1.diskStorage)({
     },
 });
 let WhatsappController = WhatsappController_1 = class WhatsappController {
-    constructor(waService, webhookService, redSocialWebhookService, redSocialService, confClienteService) {
+    constructor(waService, webhookService, redSocialWebhookService, redSocialService, confClienteService, plantillaService) {
         this.waService = waService;
         this.webhookService = webhookService;
         this.redSocialWebhookService = redSocialWebhookService;
         this.redSocialService = redSocialService;
         this.confClienteService = confClienteService;
+        this.plantillaService = plantillaService;
         this.logger = new common_1.Logger(WhatsappController_1.name);
     }
     async verificarWebhook(query, res) {
@@ -74,6 +76,11 @@ let WhatsappController = WhatsappController_1 = class WhatsappController {
                         const value = change.value;
                         if (!value)
                             continue;
+                        if (change.field === 'message_template_status_update') {
+                            this.procesarActualizacionPlantilla(entry.id, value)
+                                .catch(err => this.logger.error(`[WA] Error async procesando estado de plantilla: ${err.message}`));
+                            continue;
+                        }
                         const phoneNumberId = value.metadata?.phone_number_id || '';
                         const contacts = value.contacts || [];
                         for (const rawMessage of (value.messages || [])) {
@@ -109,6 +116,17 @@ let WhatsappController = WhatsappController_1 = class WhatsappController {
             return 'EVENT_RECEIVED';
         }
         return 'EVENT_RECEIVED';
+    }
+    async procesarActualizacionPlantilla(wabaId, value) {
+        const clienteId = await this.confClienteService.resolverClientePorWabaId(wabaId);
+        if (!clienteId) {
+            this.logger.warn(`[WA] Webhook de plantilla ignorado: no hay cliente configurado con WABA_ID=${wabaId}`);
+            return;
+        }
+        const metaTemplateId = String(value.message_template_id || '');
+        if (!metaTemplateId)
+            return;
+        await this.plantillaService.actualizarEstadoPorWebhook(clienteId, metaTemplateId, value.event, value.reason);
     }
     async obtenerConfig(req) {
         const config = await this.waService.obtenerConfig(this.clienteIdDe(req));
@@ -252,7 +270,8 @@ WhatsappController = WhatsappController_1 = __decorate([
         whatsapp_webhook_service_1.WhatsappWebhookService,
         red_social_webhook_service_1.RedSocialWebhookService,
         red_social_service_1.RedSocialService,
-        configuracion_cliente_service_1.ConfiguracionClienteService])
+        configuracion_cliente_service_1.ConfiguracionClienteService,
+        plantilla_whatsapp_service_1.PlantillaWhatsappService])
 ], WhatsappController);
 exports.WhatsappController = WhatsappController;
 //# sourceMappingURL=whatsapp.controller.js.map

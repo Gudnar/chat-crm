@@ -76,6 +76,26 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateAgenteDto.prototype, "color", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false, description: 'Si está activo, reenvía un mensaje cuando una conversación queda pendiente sin foto/ubicación por N horas' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateAgenteDto.prototype, "recordatorioActivo", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 3, required: false }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    (0, class_validator_1.Max)(72),
+    __metadata("design:type", Number)
+], CreateAgenteDto.prototype, "recordatorioHoras", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateAgenteDto.prototype, "recordatorioMensaje", void 0);
 exports.CreateAgenteDto = CreateAgenteDto;
 class UpdateAgenteDto extends CreateAgenteDto {
 }

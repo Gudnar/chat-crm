@@ -63,6 +63,45 @@ let WhatsappService = WhatsappService_1 = class WhatsappService {
         });
         return res.data;
     }
+    async apiCall(method, path, accessToken, data, params) {
+        const res = await axios_1.default.request({
+            method,
+            url: `${WA_BASE_URL}/${path}`,
+            data,
+            params,
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        });
+        return res.data;
+    }
+    async crearPlantillaMeta(config, payload) {
+        return this.apiCall('post', `${config.wabaId}/message_templates`, config.accessToken, payload);
+    }
+    async consultarEstadoPlantillaMeta(config, metaTemplateId) {
+        return this.apiCall('get', metaTemplateId, config.accessToken, undefined, { fields: 'status,rejected_reason' });
+    }
+    async eliminarPlantillaMeta(config, nombre) {
+        await this.apiCall('delete', `${config.wabaId}/message_templates`, config.accessToken, undefined, { name: nombre });
+    }
+    async enviarPlantilla(to, nombrePlantilla, idioma, componentesEnvio, config) {
+        try {
+            await this.apiPost(config.phoneNumberId, config.accessToken, {
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: to.replace(/\D/g, ''),
+                type: 'template',
+                template: {
+                    name: nombrePlantilla,
+                    language: { code: idioma },
+                    ...(componentesEnvio.length ? { components: componentesEnvio } : {}),
+                },
+            });
+        }
+        catch (err) {
+            const msg = err?.response?.data?.error?.message || err.message;
+            this.logger.warn(`[WA] No se pudo enviar plantilla (${nombrePlantilla}): ${msg}`);
+            throw new Error(msg);
+        }
+    }
     async enviarTexto(to, text, config) {
         if (!config.accessToken || !config.phoneNumberId) {
             this.logger.error(`[WA] Envío fallido — accessToken:${!!config.accessToken} phoneNumberId:${!!config.phoneNumberId}`, '');

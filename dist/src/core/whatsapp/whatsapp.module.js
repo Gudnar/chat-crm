@@ -8,9 +8,14 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.WhatsappModule = void 0;
 const common_1 = require("@nestjs/common");
+const typeorm_1 = require("@nestjs/typeorm");
 const whatsapp_controller_1 = require("./controller/whatsapp.controller");
+const plantilla_whatsapp_controller_1 = require("./controller/plantilla-whatsapp.controller");
 const whatsapp_service_1 = require("./service/whatsapp.service");
 const whatsapp_webhook_service_1 = require("./service/whatsapp-webhook.service");
+const recordatorio_service_1 = require("./service/recordatorio.service");
+const plantilla_whatsapp_service_1 = require("./service/plantilla-whatsapp.service");
+const plantilla_whatsapp_entity_1 = require("./entity/plantilla-whatsapp.entity");
 const cliente_module_1 = require("../cliente/cliente.module");
 const conversacion_module_1 = require("../conversacion/conversacion.module");
 const agente_module_1 = require("../agente/agente.module");
@@ -26,6 +31,7 @@ let WhatsappModule = class WhatsappModule {
 WhatsappModule = __decorate([
     (0, common_1.Module)({
         imports: [
+            typeorm_1.TypeOrmModule.forFeature([plantilla_whatsapp_entity_1.PlantillaWhatsapp]),
             cliente_module_1.ClienteModule,
             conversacion_module_1.ConversacionModule,
             agente_module_1.AgenteModule,
@@ -36,9 +42,9 @@ WhatsappModule = __decorate([
             reservacion_module_1.ReservacionModule,
             (0, common_1.forwardRef)(() => red_social_module_1.RedSocialModule),
         ],
-        controllers: [whatsapp_controller_1.WhatsappController],
-        providers: [whatsapp_service_1.WhatsappService, whatsapp_webhook_service_1.WhatsappWebhookService, tool_executor_service_1.ToolExecutorService],
-        exports: [whatsapp_service_1.WhatsappService],
+        controllers: [whatsapp_controller_1.WhatsappController, plantilla_whatsapp_controller_1.PlantillaWhatsappController],
+        providers: [whatsapp_service_1.WhatsappService, whatsapp_webhook_service_1.WhatsappWebhookService, tool_executor_service_1.ToolExecutorService, recordatorio_service_1.RecordatorioService, plantilla_whatsapp_service_1.PlantillaWhatsappService],
+        exports: [whatsapp_service_1.WhatsappService, plantilla_whatsapp_service_1.PlantillaWhatsappService],
     })
 ], WhatsappModule);
 exports.WhatsappModule = WhatsappModule;

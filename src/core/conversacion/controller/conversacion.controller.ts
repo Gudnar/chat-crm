@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query, Request, UseGuards } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, Request, UseGuards } from '@nestjs/common'
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger'
 import { ConversacionService } from '../service/conversacion.service'
 import { CalificacionService } from '../service/calificacion.service'
@@ -107,6 +107,12 @@ export class ConversacionController {
   ): Promise<SuccessResponseDto> {
     const datos = await this.conversacionService.actualizarAgente(id, agenteId)
     return new SuccessResponseDto(datos, 'Agente asignado')
+  }
+
+  @Delete(':id')
+  async eliminar(@Param('id') id: string, @Request() req: any): Promise<SuccessResponseDto> {
+    await this.conversacionService.eliminar(id, req.user.clienteId, req.user.id)
+    return new SuccessResponseDto(null, 'Conversación eliminada')
   }
 
   @Patch(':id')

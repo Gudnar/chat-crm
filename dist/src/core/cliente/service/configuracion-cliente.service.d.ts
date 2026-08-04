@@ -11,4 +11,5 @@ export declare class ConfiguracionClienteService extends BaseService {
     eliminar(clienteId: string, clave: string, usuarioModificacion: string): Promise<void>;
     resolverClientePorPhoneNumberId(phoneNumberId: string): Promise<string | null>;
     resolverClientePorVerifyToken(verifyToken: string): Promise<string | null>;
+    resolverClientePorWabaId(wabaId: string): Promise<string | null>;
 }

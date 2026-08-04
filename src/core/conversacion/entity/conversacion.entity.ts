@@ -49,6 +49,10 @@ export class Conversacion extends AuditoriaEntity {
   @Column({ name: 'total_mensajes', type: 'int', default: 0 })
   totalMensajes: number
 
+  /** Marca cuándo se mandó el último recordatorio automático — evita repetirlo cada vez que corre el cron. */
+  @Column({ name: 'ultimo_recordatorio_en', type: 'timestamptz', nullable: true })
+  ultimoRecordatorioEn?: Date | null
+
   @Column({ name: 'escalado', type: 'boolean', default: false })
   escalado: boolean
 

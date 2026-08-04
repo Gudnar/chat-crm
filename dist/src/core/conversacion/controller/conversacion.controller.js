@@ -77,6 +77,10 @@ let ConversacionController = class ConversacionController {
         const datos = await this.conversacionService.actualizarAgente(id, agenteId);
         return new success_response_dto_1.SuccessResponseDto(datos, 'Agente asignado');
     }
+    async eliminar(id, req) {
+        await this.conversacionService.eliminar(id, req.user.clienteId, req.user.id);
+        return new success_response_dto_1.SuccessResponseDto(null, 'Conversación eliminada');
+    }
     async actualizar(id, body, req) {
         let datos = await this.conversacionService.obtenerPorClienteId(id, req.user.clienteId);
         if ('notas' in body) {
@@ -200,6 +204,14 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
 ], ConversacionController.prototype, "actualizarAgente", null);
+__decorate([
+    (0, common_1.Delete)(':id'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Request)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], ConversacionController.prototype, "eliminar", null);
 __decorate([
     (0, common_1.Patch)(':id'),
     __param(0, (0, common_1.Param)('id')),

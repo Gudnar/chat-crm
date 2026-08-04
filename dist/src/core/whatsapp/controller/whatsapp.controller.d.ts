@@ -5,6 +5,7 @@ import { WhatsappWebhookService } from '../service/whatsapp-webhook.service';
 import { RedSocialWebhookService } from '../../red-social/service/red-social-webhook.service';
 import { RedSocialService } from '../../red-social/service/red-social.service';
 import { ConfiguracionClienteService } from '../../cliente/service/configuracion-cliente.service';
+import { PlantillaWhatsappService } from '../service/plantilla-whatsapp.service';
 import { WhatsappConfigDto, EnviarMensajeDto, EnviarAdjuntoDto, TestConexionDto } from '../dto/whatsapp.dto';
 import { SuccessResponseDto } from '../../../common/dto/success-response.dto';
 export declare class WhatsappController {
@@ -13,10 +14,12 @@ export declare class WhatsappController {
     private readonly redSocialWebhookService;
     private readonly redSocialService;
     private readonly confClienteService;
+    private readonly plantillaService;
     private readonly logger;
-    constructor(waService: WhatsappService, webhookService: WhatsappWebhookService, redSocialWebhookService: RedSocialWebhookService, redSocialService: RedSocialService, confClienteService: ConfiguracionClienteService);
+    constructor(waService: WhatsappService, webhookService: WhatsappWebhookService, redSocialWebhookService: RedSocialWebhookService, redSocialService: RedSocialService, confClienteService: ConfiguracionClienteService, plantillaService: PlantillaWhatsappService);
     verificarWebhook(query: any, res: Response): Promise<void>;
     recibirWebhook(body: any): Promise<string>;
+    private procesarActualizacionPlantilla;
     obtenerConfig(req: any): Promise<{
         accessToken: string;
         _hasAccessToken: boolean;

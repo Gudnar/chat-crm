@@ -46,6 +46,13 @@ export class AgenteService extends BaseService {
     })
   }
 
+  /** Agentes IA activos con el recordatorio automático encendido — usado por el cron de RecordatorioService. */
+  async listarConRecordatorioActivo(): Promise<Agente[]> {
+    return this.agenteRepository.find({
+      where: { recordatorioActivo: true, activo: true, estado: Status.ACTIVE },
+    })
+  }
+
   async crear(dto: CreateAgenteDto, usuarioCreacion: string, clienteId: string): Promise<Agente> {
     const agente = this.agenteRepository.create({
       ...dto,

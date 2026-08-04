@@ -64,6 +64,18 @@ export class Agente extends AuditoriaEntity {
   @Column({ name: 'modo_operacion', length: 20, default: 'hybrid' })
   modoOperacion: string
 
+  // ── Recordatorio automático: si una conversación queda "pendiente" sin que el
+  // cliente mande foto ni ubicación, este agente puede reenviarle un mensaje solo
+  // pasadas N horas (ver RecordatorioService, cron cada 15 min). ──
+  @Column({ name: 'recordatorio_activo', type: 'boolean', default: false })
+  recordatorioActivo: boolean
+
+  @Column({ name: 'recordatorio_horas', type: 'int', default: 3 })
+  recordatorioHoras: number
+
+  @Column({ name: 'recordatorio_mensaje', type: 'text', nullable: true })
+  recordatorioMensaje?: string
+
   @Column({ name: 'activo', type: 'boolean', default: true })
   activo: boolean
 

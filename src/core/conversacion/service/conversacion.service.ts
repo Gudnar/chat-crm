@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Repository } from 'typeorm'
+import { IsNull, Repository } from 'typeorm'
 import { Conversacion } from '../entity/conversacion.entity'
 import { CreateConversacionDto, AgregarMensajeDto } from '../dto/create-conversacion.dto'
 import { BaseService } from '../../../common/base/base-service'
@@ -82,6 +82,34 @@ export class ConversacionService extends BaseService {
     await this.conversacionRepository.save(conv)
   }
 
+  /**
+   * Conversaciones "pendiente" de un agente cuyo último mensaje es del cliente, tiene
+   * al menos `horasMinimas` de antigüedad, nunca recibió un recordatorio, y en ningún
+   * mensaje hay foto ni ubicación — o sea, siguen esperando la captura. El filtrado se
+   * hace en JS (no en SQL/JSONB) a propósito: son pocas filas por agente y es mucho
+   * más simple de mantener que una consulta JSONB compleja.
+   */
+  async listarPendientesParaRecordatorio(agenteId: string, horasMinimas: number): Promise<Conversacion[]> {
+    const candidatas = await this.conversacionRepository.find({
+      where: { agenteId, estadoConversacion: 'pendiente', estado: Status.ACTIVE, ultimoRecordatorioEn: IsNull() },
+    })
+
+    const limite = Date.now() - horasMinimas * 60 * 60 * 1000
+    return candidatas.filter(conv => {
+      const mensajes = conv.mensajes || []
+      if (!mensajes.length) return false
+      const ultimo = mensajes[mensajes.length - 1]
+      if (ultimo.role !== 'user') return false
+      if (new Date(ultimo.timestamp).getTime() > limite) return false
+      const yaTieneCaptura = mensajes.some(m => m.adjunto?.tipo === 'image' || m.ubicacion)
+      return !yaTieneCaptura
+    })
+  }
+
+  async marcarRecordatorioEnviado(id: string): Promise<void> {
+    await this.conversacionRepository.update(id, { ultimoRecordatorioEn: new Date() })
+  }
+
   async yaSeEnvioRecurso(id: string, recursoId: string): Promise<boolean> {
     const conv = await this.obtener(id)
     return (conv.recursosEnviados || []).includes(recursoId)
@@ -101,6 +129,14 @@ export class ConversacionService extends BaseService {
 
   async actualizarEstado(id: string, estadoConversacion: string): Promise<void> {
     await this.conversacionRepository.update(id, { estadoConversacion })
+  }
+
+  async eliminar(id: string, clienteId: string, usuarioModificacion: string): Promise<void> {
+    const conv = await this.obtenerPorClienteId(id, clienteId)
+    conv.estado = Status.ELIMINATE
+    conv.transaccion = Transacccion.ELIMINAR
+    conv.usuarioModificacion = usuarioModificacion
+    await this.conversacionRepository.save(conv)
   }
 
   async escalar(id: string, razon?: string): Promise<void> {

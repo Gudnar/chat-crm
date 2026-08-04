@@ -9,6 +9,7 @@ import { WhatsappWebhookService } from '../service/whatsapp-webhook.service'
 import { RedSocialWebhookService } from '../../red-social/service/red-social-webhook.service'
 import { RedSocialService } from '../../red-social/service/red-social.service'
 import { ConfiguracionClienteService } from '../../cliente/service/configuracion-cliente.service'
+import { PlantillaWhatsappService } from '../service/plantilla-whatsapp.service'
 import { WhatsappConfigDto, EnviarMensajeDto, EnviarAdjuntoDto, TestConexionDto, WaWebhookMessage, WaContact } from '../dto/whatsapp.dto'
 import { SuccessResponseDto } from '../../../common/dto/success-response.dto'
 
@@ -30,6 +31,7 @@ export class WhatsappController {
     private readonly redSocialWebhookService: RedSocialWebhookService,
     private readonly redSocialService: RedSocialService,
     private readonly confClienteService: ConfiguracionClienteService,
+    private readonly plantillaService: PlantillaWhatsappService,
   ) {}
 
   // ── Webhook verification (GET) — WA + FB/IG ──────────────────
@@ -76,6 +78,14 @@ export class WhatsappController {
           for (const change of entry.changes || []) {
             const value = change.value
             if (!value) continue
+
+            // Estado de plantilla (aprobada/rechazada/pausada) — no trae phone_number_id, se identifica por el WABA (entry.id)
+            if (change.field === 'message_template_status_update') {
+              this.procesarActualizacionPlantilla(entry.id, value)
+                .catch(err => this.logger.error(`[WA] Error async procesando estado de plantilla: ${err.message}`))
+              continue
+            }
+
             const phoneNumberId: string = value.metadata?.phone_number_id || ''
             const contacts: WaContact[] = value.contacts || []
             for (const rawMessage of (value.messages || []) as WaWebhookMessage[]) {
@@ -111,6 +121,18 @@ export class WhatsappController {
     }
 
     return 'EVENT_RECEIVED'
+  }
+
+  /** value: {event, message_template_id, message_template_name, message_template_language, reason} — payload documentado por Meta para message_template_status_update. */
+  private async procesarActualizacionPlantilla(wabaId: string, value: any): Promise<void> {
+    const clienteId = await this.confClienteService.resolverClientePorWabaId(wabaId)
+    if (!clienteId) {
+      this.logger.warn(`[WA] Webhook de plantilla ignorado: no hay cliente configurado con WABA_ID=${wabaId}`)
+      return
+    }
+    const metaTemplateId: string = String(value.message_template_id || '')
+    if (!metaTemplateId) return
+    await this.plantillaService.actualizarEstadoPorWebhook(clienteId, metaTemplateId, value.event, value.reason)
   }
 
   // ── Authenticated endpoints ───────────────────────────────────

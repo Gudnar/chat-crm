@@ -94,6 +94,18 @@ __decorate([
     __metadata("design:type", String)
 ], Agente.prototype, "modoOperacion", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: 'recordatorio_activo', type: 'boolean', default: false }),
+    __metadata("design:type", Boolean)
+], Agente.prototype, "recordatorioActivo", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'recordatorio_horas', type: 'int', default: 3 }),
+    __metadata("design:type", Number)
+], Agente.prototype, "recordatorioHoras", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'recordatorio_mensaje', type: 'text', nullable: true }),
+    __metadata("design:type", String)
+], Agente.prototype, "recordatorioMensaje", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: 'activo', type: 'boolean', default: true }),
     __metadata("design:type", Boolean)
 ], Agente.prototype, "activo", void 0);

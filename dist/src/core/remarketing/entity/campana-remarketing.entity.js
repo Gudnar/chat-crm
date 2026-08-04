@@ -65,6 +65,10 @@ __decorate([
     __metadata("design:type", String)
 ], CampanaRemarketing.prototype, "canalObjetivo", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: 'plantilla_id', type: 'bigint', nullable: true }),
+    __metadata("design:type", Object)
+], CampanaRemarketing.prototype, "plantillaId", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: 'total_enviados', type: 'int', default: 0 }),
     __metadata("design:type", Number)
 ], CampanaRemarketing.prototype, "totalEnviados", void 0);

@@ -101,3 +101,16 @@ export const EstadoReserva = {
   COMPLETADA: 'completada',
   NO_ASISTIO: 'no_asistio',
 }
+
+export const EstadoPlantillaWhatsapp = {
+  PENDIENTE_META: 'pendiente_meta',
+  APROBADA: 'aprobada',
+  RECHAZADA: 'rechazada',
+  PAUSADA: 'pausada',
+}
+
+export const CategoriaPlantillaWhatsapp = {
+  MARKETING: 'MARKETING',
+  UTILITY: 'UTILITY',
+  AUTHENTICATION: 'AUTHENTICATION',
+}

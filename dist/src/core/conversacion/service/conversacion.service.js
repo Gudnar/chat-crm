@@ -89,6 +89,27 @@ let ConversacionService = ConversacionService_1 = class ConversacionService exte
         conv.transaccion = constants_1.Transacccion.ACTUALIZAR;
         await this.conversacionRepository.save(conv);
     }
+    async listarPendientesParaRecordatorio(agenteId, horasMinimas) {
+        const candidatas = await this.conversacionRepository.find({
+            where: { agenteId, estadoConversacion: 'pendiente', estado: constants_1.Status.ACTIVE, ultimoRecordatorioEn: (0, typeorm_2.IsNull)() },
+        });
+        const limite = Date.now() - horasMinimas * 60 * 60 * 1000;
+        return candidatas.filter(conv => {
+            const mensajes = conv.mensajes || [];
+            if (!mensajes.length)
+                return false;
+            const ultimo = mensajes[mensajes.length - 1];
+            if (ultimo.role !== 'user')
+                return false;
+            if (new Date(ultimo.timestamp).getTime() > limite)
+                return false;
+            const yaTieneCaptura = mensajes.some(m => m.adjunto?.tipo === 'image' || m.ubicacion);
+            return !yaTieneCaptura;
+        });
+    }
+    async marcarRecordatorioEnviado(id) {
+        await this.conversacionRepository.update(id, { ultimoRecordatorioEn: new Date() });
+    }
     async yaSeEnvioRecurso(id, recursoId) {
         const conv = await this.obtener(id);
         return (conv.recursosEnviados || []).includes(recursoId);
@@ -106,6 +127,13 @@ let ConversacionService = ConversacionService_1 = class ConversacionService exte
     }
     async actualizarEstado(id, estadoConversacion) {
         await this.conversacionRepository.update(id, { estadoConversacion });
+    }
+    async eliminar(id, clienteId, usuarioModificacion) {
+        const conv = await this.obtenerPorClienteId(id, clienteId);
+        conv.estado = constants_1.Status.ELIMINATE;
+        conv.transaccion = constants_1.Transacccion.ELIMINAR;
+        conv.usuarioModificacion = usuarioModificacion;
+        await this.conversacionRepository.save(conv);
     }
     async escalar(id, razon) {
         const conv = await this.obtener(id);

@@ -26,17 +26,20 @@ const campana_remarketing_entity_1 = require("../entity/campana-remarketing.enti
 const envio_remarketing_entity_1 = require("../entity/envio-remarketing.entity");
 const conversacion_entity_1 = require("../../conversacion/entity/conversacion.entity");
 const whatsapp_service_1 = require("../../whatsapp/service/whatsapp.service");
+const plantilla_whatsapp_service_1 = require("../../whatsapp/service/plantilla-whatsapp.service");
 const configuracion_cliente_service_1 = require("../../cliente/service/configuracion-cliente.service");
 const base_service_1 = require("../../../common/base/base-service");
 const constants_1 = require("../../../common/constants");
+const ventana_24h_util_1 = require("../../../common/lib/ventana-24h.util");
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages';
 let RemarketingService = RemarketingService_1 = class RemarketingService extends base_service_1.BaseService {
-    constructor(campanaRepo, envioRepo, convRepo, whatsappService, confClienteService) {
+    constructor(campanaRepo, envioRepo, convRepo, whatsappService, plantillaService, confClienteService) {
         super(RemarketingService_1.name);
         this.campanaRepo = campanaRepo;
         this.envioRepo = envioRepo;
         this.convRepo = convRepo;
         this.whatsappService = whatsappService;
+        this.plantillaService = plantillaService;
         this.confClienteService = confClienteService;
     }
     async procesarCampanasProgramadas() {
@@ -156,6 +159,7 @@ let RemarketingService = RemarketingService_1 = class RemarketingService extends
                 const keyConf = await this.confClienteService.obtenerPorClave(campana.clienteId, 'ANTHROPIC_API_KEY');
                 apiKey = keyConf?.valor;
             }
+            const plantilla = await this._obtenerPlantillaDeRespaldo(campana);
             let totalEnviados = 0;
             let totalErrores = 0;
             for (const conv of targets) {
@@ -179,7 +183,25 @@ let RemarketingService = RemarketingService_1 = class RemarketingService extends
                     else {
                         mensajeFinal = campana.mensaje.replace(/\{contacto\}/gi, conv.contacto);
                     }
-                    await this.whatsappService.enviarTexto(conv.contacto, mensajeFinal, waConfig);
+                    if ((0, ventana_24h_util_1.estaFueraDeVentana24h)(conv.mensajes)) {
+                        if (!plantilla) {
+                            throw new Error('Contacto fuera de la ventana de 24h — configura una "plantilla de respaldo" en la campaña para poder escribirle');
+                        }
+                        const placeholders = (plantilla.componentes.body.texto.match(/\{\{\d+\}\}/g) || []).length;
+                        if (placeholders > 1) {
+                            throw new Error('La plantilla de respaldo tiene más de una variable — no soportado en remarketing automático');
+                        }
+                        const componentesEnvio = placeholders === 1
+                            ? [{ type: 'body', parameters: [{ type: 'text', text: mensajeFinal }] }]
+                            : [];
+                        await this.whatsappService.enviarPlantilla(conv.contacto, plantilla.nombre, plantilla.idioma, componentesEnvio, waConfig);
+                        mensajeFinal = placeholders === 1
+                            ? plantilla.componentes.body.texto.replace('{{1}}', mensajeFinal)
+                            : plantilla.componentes.body.texto;
+                    }
+                    else {
+                        await this.whatsappService.enviarTexto(conv.contacto, mensajeFinal, waConfig);
+                    }
                     await this.envioRepo.update(envioGuardado.id, {
                         estadoEnvio: 'enviado',
                         mensajeEnviado: mensajeFinal,
@@ -209,6 +231,22 @@ let RemarketingService = RemarketingService_1 = class RemarketingService extends
                 totalErrores: 1,
             });
             throw err;
+        }
+    }
+    async _obtenerPlantillaDeRespaldo(campana) {
+        if (!campana.plantillaId)
+            return null;
+        try {
+            const plantilla = await this.plantillaService.obtener(campana.plantillaId, campana.clienteId);
+            if (plantilla.estadoPlantilla !== constants_1.EstadoPlantillaWhatsapp.APROBADA) {
+                this.logger.warn(`[Remarketing] Campaña ${campana.id}: la plantilla de respaldo "${plantilla.nombre}" no está aprobada (${plantilla.estadoPlantilla})`);
+                return null;
+            }
+            return plantilla;
+        }
+        catch {
+            this.logger.warn(`[Remarketing] Campaña ${campana.id}: no se encontró la plantilla de respaldo configurada`);
+            return null;
         }
     }
     async _generarMensajeIA(conv, objetivo, apiKey) {
@@ -250,6 +288,7 @@ RemarketingService = RemarketingService_1 = __decorate([
         typeorm_2.Repository,
         typeorm_2.Repository,
         whatsapp_service_1.WhatsappService,
+        plantilla_whatsapp_service_1.PlantillaWhatsappService,
         configuracion_cliente_service_1.ConfiguracionClienteService])
 ], RemarketingService);
 exports.RemarketingService = RemarketingService;

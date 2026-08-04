@@ -12,6 +12,7 @@ export declare class CampanaRemarketing extends AuditoriaEntity {
     scoreMin: number;
     scoreMax: number;
     canalObjetivo: string;
+    plantillaId?: string | null;
     totalEnviados: number;
     totalErrores: number;
     clienteId: string;

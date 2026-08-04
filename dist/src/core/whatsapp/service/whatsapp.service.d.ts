@@ -15,6 +15,22 @@ export declare class WhatsappService {
     obtenerConfig(clienteId: string): Promise<WaConfig>;
     guardarConfig(clienteId: string, data: Partial<WaConfig>, usuarioId: string): Promise<void>;
     private apiPost;
+    private apiCall;
+    crearPlantillaMeta(config: WaConfig, payload: {
+        name: string;
+        category: string;
+        language: string;
+        components: any[];
+    }): Promise<{
+        id: string;
+        status: string;
+    }>;
+    consultarEstadoPlantillaMeta(config: WaConfig, metaTemplateId: string): Promise<{
+        status: string;
+        rejected_reason?: string;
+    }>;
+    eliminarPlantillaMeta(config: WaConfig, nombre: string): Promise<void>;
+    enviarPlantilla(to: string, nombrePlantilla: string, idioma: string, componentesEnvio: any[], config: WaConfig): Promise<void>;
     enviarTexto(to: string, text: string, config: WaConfig): Promise<any>;
     descargarMedia(mediaId: string, config: WaConfig): Promise<{
         buffer: Buffer;

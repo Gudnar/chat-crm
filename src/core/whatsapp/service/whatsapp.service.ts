@@ -66,6 +66,61 @@ export class WhatsappService {
     return res.data
   }
 
+  /** Llamada genérica a un endpoint de administración de Meta (no .../messages) — usada por plantillas. */
+  private async apiCall(method: 'get' | 'post' | 'delete', path: string, accessToken: string, data?: object, params?: object): Promise<any> {
+    const res = await axios.request({
+      method,
+      url: `${WA_BASE_URL}/${path}`,
+      data,
+      params,
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    })
+    return res.data
+  }
+
+  // ── Plantillas (message templates) ─────────────────────────────
+  // Requieren el permiso `whatsapp_business_management` en el access token — el
+  // usado solo para mandar mensajes (`whatsapp_business_messaging`) no alcanza.
+
+  /** Crea la plantilla en Meta para revisión — queda en estado PENDING hasta que la aprueben/rechacen. */
+  async crearPlantillaMeta(
+    config: WaConfig,
+    payload: { name: string; category: string; language: string; components: any[] },
+  ): Promise<{ id: string; status: string }> {
+    return this.apiCall('post', `${config.wabaId}/message_templates`, config.accessToken, payload)
+  }
+
+  /** Consulta el estado actual de una plantilla ya creada (APPROVED / REJECTED / PENDING / PAUSED). */
+  async consultarEstadoPlantillaMeta(config: WaConfig, metaTemplateId: string): Promise<{ status: string; rejected_reason?: string }> {
+    return this.apiCall('get', metaTemplateId, config.accessToken, undefined, { fields: 'status,rejected_reason' })
+  }
+
+  /** Elimina la plantilla en Meta (se identifica por nombre, no por ID). */
+  async eliminarPlantillaMeta(config: WaConfig, nombre: string): Promise<void> {
+    await this.apiCall('delete', `${config.wabaId}/message_templates`, config.accessToken, undefined, { name: nombre })
+  }
+
+  /** Manda un mensaje de plantilla ya APROBADA — el único tipo permitido fuera de la ventana de 24h. Lanza si Meta la rechaza (igual que enviarTexto) para que el llamador registre el error por contacto. */
+  async enviarPlantilla(to: string, nombrePlantilla: string, idioma: string, componentesEnvio: any[], config: WaConfig): Promise<void> {
+    try {
+      await this.apiPost(config.phoneNumberId, config.accessToken, {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: to.replace(/\D/g, ''),
+        type: 'template',
+        template: {
+          name: nombrePlantilla,
+          language: { code: idioma },
+          ...(componentesEnvio.length ? { components: componentesEnvio } : {}),
+        },
+      })
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err.message
+      this.logger.warn(`[WA] No se pudo enviar plantilla (${nombrePlantilla}): ${msg}`)
+      throw new Error(msg)
+    }
+  }
+
   async enviarTexto(to: string, text: string, config: WaConfig): Promise<any> {
     if (!config.accessToken || !config.phoneNumberId) {
       this.logger.error(`[WA] Envío fallido — accessToken:${!!config.accessToken} phoneNumberId:${!!config.phoneNumberId}`, '')

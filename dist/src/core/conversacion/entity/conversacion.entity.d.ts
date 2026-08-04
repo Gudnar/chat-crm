@@ -39,6 +39,7 @@ export declare class Conversacion extends AuditoriaEntity {
         };
     }>;
     totalMensajes: number;
+    ultimoRecordatorioEn?: Date | null;
     escalado: boolean;
     etiquetas: string[];
     recursosEnviados: string[];

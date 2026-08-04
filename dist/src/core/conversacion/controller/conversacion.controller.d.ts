@@ -19,5 +19,6 @@ export declare class ConversacionController {
     actualizarEstado(id: string, estadoConversacion: string): Promise<SuccessResponseDto>;
     actualizarNotas(id: string, notas: string): Promise<SuccessResponseDto>;
     actualizarAgente(id: string, agenteId: string | null): Promise<SuccessResponseDto>;
+    eliminar(id: string, req: any): Promise<SuccessResponseDto>;
     actualizar(id: string, body: any, req: any): Promise<SuccessResponseDto>;
 }

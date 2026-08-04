@@ -4,6 +4,7 @@ import { EnvioRemarketing } from '../entity/envio-remarketing.entity';
 import { CreateCampanaDto } from '../dto/campana.dto';
 import { Conversacion } from '../../conversacion/entity/conversacion.entity';
 import { WhatsappService } from '../../whatsapp/service/whatsapp.service';
+import { PlantillaWhatsappService } from '../../whatsapp/service/plantilla-whatsapp.service';
 import { ConfiguracionClienteService } from '../../cliente/service/configuracion-cliente.service';
 import { BaseService } from '../../../common/base/base-service';
 export declare class RemarketingService extends BaseService {
@@ -11,8 +12,9 @@ export declare class RemarketingService extends BaseService {
     private readonly envioRepo;
     private readonly convRepo;
     private readonly whatsappService;
+    private readonly plantillaService;
     private readonly confClienteService;
-    constructor(campanaRepo: Repository<CampanaRemarketing>, envioRepo: Repository<EnvioRemarketing>, convRepo: Repository<Conversacion>, whatsappService: WhatsappService, confClienteService: ConfiguracionClienteService);
+    constructor(campanaRepo: Repository<CampanaRemarketing>, envioRepo: Repository<EnvioRemarketing>, convRepo: Repository<Conversacion>, whatsappService: WhatsappService, plantillaService: PlantillaWhatsappService, confClienteService: ConfiguracionClienteService);
     procesarCampanasProgramadas(): Promise<void>;
     listarCampanas(clienteId: string): Promise<any[]>;
     obtenerCampana(id: string, clienteId: string): Promise<any>;
@@ -21,5 +23,6 @@ export declare class RemarketingService extends BaseService {
     eliminarCampana(id: string, userId: string, clienteId: string): Promise<void>;
     ejecutarCampanaAhora(id: string, clienteId: string): Promise<void>;
     private _ejecutar;
+    private _obtenerPlantillaDeRespaldo;
     private _generarMensajeIA;
 }

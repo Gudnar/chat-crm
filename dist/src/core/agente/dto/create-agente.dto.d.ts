@@ -9,6 +9,9 @@ export declare class CreateAgenteDto {
     modoOperacion?: string;
     avatar?: string;
     color?: string;
+    recordatorioActivo?: boolean;
+    recordatorioHoras?: number;
+    recordatorioMensaje?: string;
 }
 export declare class UpdateAgenteDto extends CreateAgenteDto {
     activo?: boolean;

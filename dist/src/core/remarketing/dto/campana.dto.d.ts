@@ -7,4 +7,5 @@ export declare class CreateCampanaDto {
     scoreMin?: number;
     scoreMax?: number;
     canalObjetivo?: string;
+    plantillaId?: string;
 }

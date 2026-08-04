@@ -53,6 +53,23 @@ export class CreateAgenteDto {
   @IsOptional()
   @IsString()
   color?: string
+
+  @ApiProperty({ required: false, description: 'Si está activo, reenvía un mensaje cuando una conversación queda pendiente sin foto/ubicación por N horas' })
+  @IsOptional()
+  @IsBoolean()
+  recordatorioActivo?: boolean
+
+  @ApiProperty({ example: 3, required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(72)
+  recordatorioHoras?: number
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  recordatorioMensaje?: string
 }
 
 export class UpdateAgenteDto extends CreateAgenteDto {

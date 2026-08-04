@@ -77,6 +77,12 @@ let ConfiguracionClienteService = ConfiguracionClienteService_1 = class Configur
         });
         return config?.clienteId ?? null;
     }
+    async resolverClientePorWabaId(wabaId) {
+        const config = await this.repo.findOne({
+            where: { clave: 'WA_WABA_ID', valor: wabaId, estado: constants_1.Status.ACTIVE },
+        });
+        return config?.clienteId ?? null;
+    }
 };
 ConfiguracionClienteService = ConfiguracionClienteService_1 = __decorate([
     (0, common_1.Injectable)(),

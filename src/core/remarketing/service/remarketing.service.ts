@@ -8,9 +8,12 @@ import { EnvioRemarketing } from '../entity/envio-remarketing.entity'
 import { CreateCampanaDto } from '../dto/campana.dto'
 import { Conversacion } from '../../conversacion/entity/conversacion.entity'
 import { WhatsappService } from '../../whatsapp/service/whatsapp.service'
+import { PlantillaWhatsappService } from '../../whatsapp/service/plantilla-whatsapp.service'
+import { PlantillaWhatsapp } from '../../whatsapp/entity/plantilla-whatsapp.entity'
 import { ConfiguracionClienteService } from '../../cliente/service/configuracion-cliente.service'
 import { BaseService } from '../../../common/base/base-service'
-import { Status, Transacccion } from '../../../common/constants'
+import { Status, Transacccion, EstadoPlantillaWhatsapp } from '../../../common/constants'
+import { estaFueraDeVentana24h } from '../../../common/lib/ventana-24h.util'
 
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages'
 
@@ -24,6 +27,7 @@ export class RemarketingService extends BaseService {
     @InjectRepository(Conversacion)
     private readonly convRepo: Repository<Conversacion>,
     private readonly whatsappService: WhatsappService,
+    private readonly plantillaService: PlantillaWhatsappService,
     private readonly confClienteService: ConfiguracionClienteService,
   ) {
     super(RemarketingService.name)
@@ -165,6 +169,8 @@ export class RemarketingService extends BaseService {
         apiKey = keyConf?.valor
       }
 
+      const plantilla = await this._obtenerPlantillaDeRespaldo(campana)
+
       let totalEnviados = 0
       let totalErrores = 0
 
@@ -184,14 +190,33 @@ export class RemarketingService extends BaseService {
 
         try {
           let mensajeFinal: string
-
           if (campana.tipoMensaje === 'ia' && apiKey) {
             mensajeFinal = await this._generarMensajeIA(conv, campana.mensaje, apiKey)
           } else {
             mensajeFinal = campana.mensaje.replace(/\{contacto\}/gi, conv.contacto)
           }
 
-          await this.whatsappService.enviarTexto(conv.contacto, mensajeFinal, waConfig)
+          if (estaFueraDeVentana24h(conv.mensajes)) {
+            // Fuera de la ventana de 24h: WhatsApp rechaza texto libre, exige plantilla aprobada.
+            if (!plantilla) {
+              throw new Error(
+                'Contacto fuera de la ventana de 24h — configura una "plantilla de respaldo" en la campaña para poder escribirle',
+              )
+            }
+            const placeholders = (plantilla.componentes.body.texto.match(/\{\{\d+\}\}/g) || []).length
+            if (placeholders > 1) {
+              throw new Error('La plantilla de respaldo tiene más de una variable — no soportado en remarketing automático')
+            }
+            const componentesEnvio = placeholders === 1
+              ? [{ type: 'body', parameters: [{ type: 'text', text: mensajeFinal }] }]
+              : []
+            await this.whatsappService.enviarPlantilla(conv.contacto, plantilla.nombre, plantilla.idioma, componentesEnvio, waConfig)
+            mensajeFinal = placeholders === 1
+              ? plantilla.componentes.body.texto.replace('{{1}}', mensajeFinal)
+              : plantilla.componentes.body.texto
+          } else {
+            await this.whatsappService.enviarTexto(conv.contacto, mensajeFinal, waConfig)
+          }
 
           await this.envioRepo.update(envioGuardado.id, {
             estadoEnvio: 'enviado',
@@ -221,6 +246,22 @@ export class RemarketingService extends BaseService {
         totalErrores: 1,
       })
       throw err
+    }
+  }
+
+  /** Carga la plantilla de respaldo de la campaña (si tiene una configurada y sigue aprobada). */
+  private async _obtenerPlantillaDeRespaldo(campana: CampanaRemarketing): Promise<PlantillaWhatsapp | null> {
+    if (!campana.plantillaId) return null
+    try {
+      const plantilla = await this.plantillaService.obtener(campana.plantillaId, campana.clienteId)
+      if (plantilla.estadoPlantilla !== EstadoPlantillaWhatsapp.APROBADA) {
+        this.logger.warn(`[Remarketing] Campaña ${campana.id}: la plantilla de respaldo "${plantilla.nombre}" no está aprobada (${plantilla.estadoPlantilla})`)
+        return null
+      }
+      return plantilla
+    } catch {
+      this.logger.warn(`[Remarketing] Campaña ${campana.id}: no se encontró la plantilla de respaldo configurada`)
+      return null
     }
   }
 

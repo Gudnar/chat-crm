@@ -10,4 +10,6 @@ export class CreateCampanaDto {
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) @Max(100) scoreMin?: number
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) @Max(100) scoreMax?: number
   @ApiPropertyOptional() @IsOptional() @IsString() canalObjetivo?: string
+  @ApiPropertyOptional({ description: 'Plantilla aprobada a usar con contactos fuera de la ventana de 24h' })
+  @IsOptional() @IsString() plantillaId?: string
 }

@@ -37,6 +37,10 @@ export class CampanaRemarketing extends AuditoriaEntity {
   @Column({ name: 'canal_objetivo', length: 20, default: 'whatsapp' })
   canalObjetivo: string
 
+  /** Plantilla aprobada a usar cuando un contacto está fuera de la ventana de 24h (Meta rechaza texto libre ahí). */
+  @Column({ name: 'plantilla_id', type: 'bigint', nullable: true })
+  plantillaId?: string | null
+
   @Column({ name: 'total_enviados', type: 'int', default: 0 })
   totalEnviados: number
 

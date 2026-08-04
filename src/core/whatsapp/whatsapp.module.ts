@@ -1,7 +1,12 @@
 import { Module, forwardRef } from '@nestjs/common'
+import { TypeOrmModule } from '@nestjs/typeorm'
 import { WhatsappController } from './controller/whatsapp.controller'
+import { PlantillaWhatsappController } from './controller/plantilla-whatsapp.controller'
 import { WhatsappService } from './service/whatsapp.service'
 import { WhatsappWebhookService } from './service/whatsapp-webhook.service'
+import { RecordatorioService } from './service/recordatorio.service'
+import { PlantillaWhatsappService } from './service/plantilla-whatsapp.service'
+import { PlantillaWhatsapp } from './entity/plantilla-whatsapp.entity'
 import { ClienteModule } from '../cliente/cliente.module'
 import { ConversacionModule } from '../conversacion/conversacion.module'
 import { AgenteModule } from '../agente/agente.module'
@@ -15,6 +20,7 @@ import { ReservacionModule } from '../reservacion/reservacion.module'
 
 @Module({
   imports: [
+    TypeOrmModule.forFeature([PlantillaWhatsapp]),
     ClienteModule,
     ConversacionModule,
     AgenteModule,
@@ -25,8 +31,8 @@ import { ReservacionModule } from '../reservacion/reservacion.module'
     ReservacionModule,
     forwardRef(() => RedSocialModule),
   ],
-  controllers: [WhatsappController],
-  providers: [WhatsappService, WhatsappWebhookService, ToolExecutorService],
-  exports: [WhatsappService],
+  controllers: [WhatsappController, PlantillaWhatsappController],
+  providers: [WhatsappService, WhatsappWebhookService, ToolExecutorService, RecordatorioService, PlantillaWhatsappService],
+  exports: [WhatsappService, PlantillaWhatsappService],
 })
 export class WhatsappModule {}

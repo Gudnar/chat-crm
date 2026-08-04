@@ -74,4 +74,12 @@ export class ConfiguracionClienteService extends BaseService {
     })
     return config?.clienteId ?? null
   }
+
+  // Resuelve clienteId a partir del wabaId (usado en el webhook de estado de plantillas, que no trae phone_number_id)
+  async resolverClientePorWabaId(wabaId: string): Promise<string | null> {
+    const config = await this.repo.findOne({
+      where: { clave: 'WA_WABA_ID', valor: wabaId, estado: Status.ACTIVE },
+    })
+    return config?.clienteId ?? null
+  }
 }

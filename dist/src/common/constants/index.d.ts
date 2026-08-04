@@ -83,3 +83,14 @@ export declare const EstadoReserva: {
     COMPLETADA: string;
     NO_ASISTIO: string;
 };
+export declare const EstadoPlantillaWhatsapp: {
+    PENDIENTE_META: string;
+    APROBADA: string;
+    RECHAZADA: string;
+    PAUSADA: string;
+};
+export declare const CategoriaPlantillaWhatsapp: {
+    MARKETING: string;
+    UTILITY: string;
+    AUTHENTICATION: string;
+};

@@ -22,6 +22,9 @@ export declare class Agente extends AuditoriaEntity {
     maxTokens: number;
     systemPrompt?: string;
     modoOperacion: string;
+    recordatorioActivo: boolean;
+    recordatorioHoras: number;
+    recordatorioMensaje?: string;
     activo: boolean;
     avatar: string;
     color: string;
