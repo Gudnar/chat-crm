@@ -475,6 +475,7 @@ export class WhatsappWebhookService {
           }
 
           const toolResults: any[] = []
+          let debePausarTurno = false
           for (const block of content as any[]) {
             if (block.type !== 'tool_use') continue
 
@@ -504,6 +505,7 @@ export class WhatsappWebhookService {
 
             if (resultado.opciones) {
               pendingOpciones.push(resultado.opciones)
+              debePausarTurno = true
             }
 
             if (resultado.botonLink) {
@@ -512,13 +514,22 @@ export class WhatsappWebhookService {
 
             if (resultado.solicitudUbicacion) {
               pendingSolicitudesUbicacion.push(resultado.solicitudUbicacion)
+              debePausarTurno = true
             }
 
             if (resultado.flow) {
               pendingFlows.push(resultado.flow)
+              debePausarTurno = true
             }
 
             toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultado.texto })
+          }
+
+          // preguntar_opciones / solicitar_ubicacion / iniciar_flow le ceden el turno al
+          // cliente: hay que esperar su respuesta, no darle al modelo otra iteración para
+          // "hablar" (eso generaba saludos/textos duplicados antes de las opciones).
+          if (debePausarTurno) {
+            return { respuesta: null, textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos, opciones: pendingOpciones, botonesLink: pendingBotonesLink, solicitudesUbicacion: pendingSolicitudesUbicacion, flows: pendingFlows }
           }
 
           messages.push({ role: 'user', content: toolResults })
