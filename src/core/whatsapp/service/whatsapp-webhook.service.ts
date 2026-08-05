@@ -122,7 +122,15 @@ export class WhatsappWebhookService {
         .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
 
       const { respuesta, textosPrevios, imagenes, documentos, audios, videos, opciones, botonesLink, solicitudesUbicacion, flows } = await this.llamarClaude(agente, historial, clienteId, conversacion.id)
-      if (!respuesta && textosPrevios.length === 0) return
+      // No hay nada que mandar solo si NINGÚN campo trae contenido. Antes solo se
+      // chequeaba respuesta/textosPrevios — con el filtro de saludos duplicados,
+      // preguntar_opciones puede llegar acá con textosPrevios vacío (el saludo
+      // suelto se descartó a propósito) y solo opciones con contenido; con el chequeo
+      // viejo esa respuesta se perdía entera y el cliente no recibía nada.
+      const hayAlgoQueEnviar = respuesta || textosPrevios.length > 0 || imagenes.length > 0 ||
+        documentos.length > 0 || audios.length > 0 || videos.length > 0 || opciones.length > 0 ||
+        botonesLink.length > 0 || solicitudesUbicacion.length > 0 || flows.length > 0
+      if (!hayAlgoQueEnviar) return
 
       // Texto escrito por Claude ANTES de invocar una tool (ej. el checklist previo
       // al envío del catálogo) — debe llegar al cliente antes que el recurso adjunto.
