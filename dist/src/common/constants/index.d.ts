@@ -94,3 +94,19 @@ export declare const CategoriaPlantillaWhatsapp: {
     UTILITY: string;
     AUTHENTICATION: string;
 };
+export declare const EstadoFlowWhatsapp: {
+    BORRADOR: string;
+    PUBLICADO: string;
+    ERROR_VALIDACION: string;
+    OBSOLETO: string;
+};
+export declare const CategoriaFlowWhatsapp: {
+    SIGN_UP: string;
+    SIGN_IN: string;
+    APPOINTMENT_BOOKING: string;
+    LEAD_GENERATION: string;
+    CONTACT_US: string;
+    CUSTOMER_SUPPORT: string;
+    SURVEY: string;
+    OTHER: string;
+};

@@ -106,6 +106,22 @@ __decorate([
     __metadata("design:type", String)
 ], Agente.prototype, "recordatorioMensaje", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: 'recordatorio_cita_activo', type: 'boolean', default: false }),
+    __metadata("design:type", Boolean)
+], Agente.prototype, "recordatorioCitaActivo", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'recordatorio_cita_horas', type: 'int', default: 2 }),
+    __metadata("design:type", Number)
+], Agente.prototype, "recordatorioCitaHoras", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'recordatorio_cita_mensaje', type: 'text', nullable: true }),
+    __metadata("design:type", String)
+], Agente.prototype, "recordatorioCitaMensaje", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'recordatorio_cita_plantilla_id', type: 'bigint', nullable: true }),
+    __metadata("design:type", Object)
+], Agente.prototype, "recordatorioCitaPlantillaId", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: 'activo', type: 'boolean', default: true }),
     __metadata("design:type", Boolean)
 ], Agente.prototype, "activo", void 0);

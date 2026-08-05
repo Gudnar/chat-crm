@@ -21,6 +21,7 @@ export declare class WhatsappWebhookService {
     procesarMensajeEntrante(rawMessage: WaWebhookMessage, contactName: string, phoneNumberId: string): Promise<void>;
     private extraerTexto;
     private extraerUbicacion;
+    private extraerRespuestaFlow;
     private esMensajeConAdjunto;
     private descargarYGuardarAdjunto;
     private extensionDesdeMime;

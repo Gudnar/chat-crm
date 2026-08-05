@@ -102,6 +102,64 @@ let WhatsappService = WhatsappService_1 = class WhatsappService {
             throw new Error(msg);
         }
     }
+    async crearFlowMeta(config, payload) {
+        return this.apiCall('post', `${config.wabaId}/flows`, config.accessToken, payload);
+    }
+    async actualizarFlowMeta(config, metaFlowId, flowJson) {
+        const form = new FormData();
+        form.append('name', 'flow.json');
+        form.append('asset_type', 'FLOW_JSON');
+        form.append('file', new Blob([flowJson], { type: 'application/json' }), 'flow.json');
+        await axios_1.default.post(`${WA_BASE_URL}/${metaFlowId}/assets`, form, {
+            headers: { Authorization: `Bearer ${config.accessToken}` },
+        });
+    }
+    async publicarFlowMeta(config, metaFlowId) {
+        await this.apiCall('post', `${metaFlowId}/publish`, config.accessToken);
+    }
+    async obtenerEstadoFlowMeta(config, metaFlowId) {
+        return this.apiCall('get', metaFlowId, config.accessToken, undefined, { fields: 'status,validation_errors' });
+    }
+    async obtenerPreviewFlowMeta(config, metaFlowId) {
+        const res = await this.apiCall('get', metaFlowId, config.accessToken, undefined, { fields: 'preview.invalidate(false)' });
+        return { preview_url: res.preview?.preview_url };
+    }
+    async eliminarFlowMeta(config, metaFlowId) {
+        await this.apiCall('delete', metaFlowId, config.accessToken);
+    }
+    async deprecarFlowMeta(config, metaFlowId) {
+        await this.apiCall('post', `${metaFlowId}/deprecate`, config.accessToken);
+    }
+    async enviarFlow(to, metaFlowId, flowToken, cta, cuerpo, screenId, config) {
+        try {
+            await this.apiPost(config.phoneNumberId, config.accessToken, {
+                messaging_product: 'whatsapp',
+                recipient_type: 'individual',
+                to: to.replace(/\D/g, ''),
+                type: 'interactive',
+                interactive: {
+                    type: 'flow',
+                    body: { text: cuerpo },
+                    action: {
+                        name: 'flow',
+                        parameters: {
+                            flow_message_version: '3',
+                            flow_token: flowToken,
+                            flow_id: metaFlowId,
+                            flow_cta: cta.slice(0, 20),
+                            flow_action: 'navigate',
+                            flow_action_payload: { screen: screenId },
+                        },
+                    },
+                },
+            });
+        }
+        catch (err) {
+            const msg = err?.response?.data?.error?.message || err.message;
+            this.logger.warn(`[WA] No se pudo enviar flow (${metaFlowId}): ${msg}`);
+            throw new Error(msg);
+        }
+    }
     async enviarTexto(to, text, config) {
         if (!config.accessToken || !config.phoneNumberId) {
             this.logger.error(`[WA] Envío fallido — accessToken:${!!config.accessToken} phoneNumberId:${!!config.phoneNumberId}`, '');

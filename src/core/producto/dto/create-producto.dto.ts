@@ -1,4 +1,5 @@
 import { IsArray, IsBoolean, IsDateString, IsInt, IsNotEmpty, IsNumber, IsObject, IsOptional, IsString, Min } from 'class-validator'
+import { Type } from 'class-transformer'
 import { ApiProperty } from '@nestjs/swagger'
 
 export class CreateProductoDto {
@@ -27,14 +28,20 @@ export class CreateProductoDto {
   @IsString()
   categoria?: string
 
+  // precio/precioOferta son columnas `decimal` — Postgres/TypeORM las devuelve como
+  // string (para no perder precisión), así que si el frontend reenvía el valor tal
+  // cual lo recibió (editar sin tocar el campo), llega como string "350.00" y
+  // @IsNumber() lo rechazaba. @Type(() => Number) lo convierte antes de validar.
   @ApiProperty({ example: 350.00 })
   @IsNotEmpty()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   precio: number
 
   @ApiProperty({ required: false, example: 299.90 })
   @IsOptional()
+  @Type(() => Number)
   @IsNumber()
   @Min(0)
   precioOferta?: number

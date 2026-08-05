@@ -69,6 +69,10 @@ export class Reserva extends AuditoriaEntity {
   @Column({ name: 'resultado', length: 30, nullable: true })
   resultado?: string
 
+  /** Evita mandar el recordatorio de la llamada más de una vez. */
+  @Column({ name: 'recordatorio_enviado', type: 'boolean', default: false })
+  recordatorioEnviado: boolean
+
   constructor(data?: Partial<Reserva>) {
     super(data)
     if (data) Object.assign(this, data)

@@ -290,6 +290,23 @@ export class ReservacionService extends BaseService {
     }
   }
 
+  /** Reservas confirmadas de este agente cuya fecha_inicio cae dentro de las próximas `horasAntes` horas y todavía no recibieron el recordatorio. */
+  async listarPendientesParaRecordatorioCita(agenteId: string, horasAntes: number): Promise<Reserva[]> {
+    const ahora = Date.now()
+    const limite = ahora + horasAntes * 60 * 60 * 1000
+    const candidatas = await this.reservaRepository.find({
+      where: { agenteId, estadoReserva: EstadoReserva.CONFIRMADA, recordatorioEnviado: false, estado: Status.ACTIVE },
+    })
+    return candidatas.filter(r => {
+      const inicio = new Date(r.fechaInicio).getTime()
+      return inicio > ahora && inicio <= limite
+    })
+  }
+
+  async marcarRecordatorioCitaEnviado(id: string): Promise<void> {
+    await this.reservaRepository.update(id, { recordatorioEnviado: true })
+  }
+
   private seSolapan(inicio1: Date, fin1: Date, inicio2: Date, fin2: Date): boolean {
     return inicio1 < fin2 && inicio2 < fin1
   }

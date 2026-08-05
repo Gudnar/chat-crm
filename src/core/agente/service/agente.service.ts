@@ -53,6 +53,12 @@ export class AgenteService extends BaseService {
     })
   }
 
+  async listarConRecordatorioCitaActivo(): Promise<Agente[]> {
+    return this.agenteRepository.find({
+      where: { recordatorioCitaActivo: true, activo: true, estado: Status.ACTIVE },
+    })
+  }
+
   async crear(dto: CreateAgenteDto, usuarioCreacion: string, clienteId: string): Promise<Agente> {
     const agente = this.agenteRepository.create({
       ...dto,

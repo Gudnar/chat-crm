@@ -35,7 +35,12 @@ export interface WaWebhookMessage {
   type: string
   text?: { body: string }
   button?: { payload: string; text: string }
-  interactive?: { type: string; button_reply?: { id: string; title: string }; list_reply?: { id: string; title: string } }
+  interactive?: {
+    type: string
+    button_reply?: { id: string; title: string }
+    list_reply?: { id: string; title: string }
+    nfm_reply?: { name: string; body: string; response_json: string }
+  }
   image?: { id: string; mime_type: string; sha256: string; caption?: string }
   audio?: { id: string; mime_type: string }
   document?: { id: string; filename: string; mime_type: string; caption?: string }

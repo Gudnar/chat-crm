@@ -70,6 +70,28 @@ export class CreateAgenteDto {
   @IsOptional()
   @IsString()
   recordatorioMensaje?: string
+
+  @ApiProperty({ required: false, description: 'Si está activo, avisa al cliente N horas antes de una llamada ya agendada con agendar_cita' })
+  @IsOptional()
+  @IsBoolean()
+  recordatorioCitaActivo?: boolean
+
+  @ApiProperty({ example: 2, required: false })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(72)
+  recordatorioCitaHoras?: number
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  recordatorioCitaMensaje?: string
+
+  @ApiProperty({ required: false, description: 'Plantilla aprobada a usar si el aviso cae fuera de la ventana de 24h' })
+  @IsOptional()
+  @IsString()
+  recordatorioCitaPlantillaId?: string
 }
 
 export class UpdateAgenteDto extends CreateAgenteDto {

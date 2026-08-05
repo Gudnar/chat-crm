@@ -19,5 +19,6 @@ export declare class Reserva extends AuditoriaEntity {
     estadoReserva: string;
     notasInternas?: string;
     resultado?: string;
+    recordatorioEnviado: boolean;
     constructor(data?: Partial<Reserva>);
 }

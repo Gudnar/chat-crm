@@ -19,15 +19,17 @@ const configuracion_cliente_service_1 = require("../../cliente/service/configura
 const recurso_service_1 = require("../../recurso/service/recurso.service");
 const recurso_entity_1 = require("../../recurso/entity/recurso.entity");
 const reservacion_service_1 = require("../../reservacion/service/reservacion.service");
+const flow_whatsapp_service_1 = require("../../whatsapp/service/flow-whatsapp.service");
 const constants_1 = require("../../../common/constants");
 const fecha_bolivia_util_1 = require("../../../common/lib/fecha-bolivia.util");
 let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
-    constructor(conversacionService, productoService, confClienteService, recursoService, reservacionService) {
+    constructor(conversacionService, productoService, confClienteService, recursoService, reservacionService, flowWhatsappService) {
         this.conversacionService = conversacionService;
         this.productoService = productoService;
         this.confClienteService = confClienteService;
         this.recursoService = recursoService;
         this.reservacionService = reservacionService;
+        this.flowWhatsappService = flowWhatsappService;
         this.logger = new common_1.Logger(ToolExecutorService_1.name);
     }
     async ejecutar(nombre, input, contexto) {
@@ -46,6 +48,8 @@ let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
                 case 'preguntar_opciones': return await this.preguntarOpciones(input, contexto);
                 case 'enviar_boton_link': return await this.enviarBotonLink(input, contexto);
                 case 'solicitar_ubicacion': return await this.solicitarUbicacion(input, contexto);
+                case 'iniciar_flow': return await this.iniciarFlow(input, contexto);
+                case 'reservar_producto': return await this.reservarProducto(input, contexto);
                 default:
                     this.logger.warn(`[Tool] Herramienta desconocida: ${nombre}`);
                     return { texto: `Herramienta "${nombre}" no está implementada.` };
@@ -112,6 +116,28 @@ let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
             solicitudUbicacion: { mensaje },
         };
     }
+    async iniciarFlow(input, ctx) {
+        const mensaje = String(input?.mensaje || '').trim();
+        const nombreFlow = String(input?.nombre_flow || '').trim().toLowerCase();
+        if (!mensaje || !nombreFlow) {
+            return { texto: '[Sistema: iniciar_flow necesita nombre_flow y mensaje. No se envió nada.]' };
+        }
+        const flows = await this.flowWhatsappService.listar(ctx.clienteId);
+        const flow = flows.find(f => f.nombre === nombreFlow && f.estadoFlow === constants_1.EstadoFlowWhatsapp.PUBLICADO);
+        if (!flow) {
+            return { texto: `[Sistema: no existe un flow publicado con el nombre "${nombreFlow}". No se envió nada — avisale al cliente que hubo un problema y seguí por texto.]` };
+        }
+        return {
+            texto: `[Sistema: se le mandó al cliente el formulario "${flow.nombre}". Espera a que lo complete y lo mande — no inventes ni asumas sus respuestas.]`,
+            flow: {
+                mensaje,
+                metaFlowId: flow.metaFlowId,
+                flowToken: `${ctx.conversacionId}-${Date.now()}`,
+                cta: flow.cta,
+                screenId: this.flowWhatsappService.obtenerScreenId(),
+            },
+        };
+    }
     async crearNota(input, ctx) {
         await this.conversacionService.agregarNota(ctx.conversacionId, input.nota);
         return { texto: `Nota interna creada: ${input.nota}` };
@@ -128,6 +154,14 @@ let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
                 : '\n\n[Sistema: estos productos NO tienen imágenes cargadas — no se envió ninguna foto al cliente]';
         }
         return { texto, imagenes };
+    }
+    async reservarProducto(input, ctx) {
+        const termino = String(input?.termino || '').trim();
+        if (!termino) {
+            return { texto: '[Sistema: reservar_producto necesita el término/nombre del producto. No se reservó nada.]' };
+        }
+        const resultado = await this.productoService.reservarUnidad(ctx.clienteId, termino);
+        return { texto: resultado.ok ? `[Sistema: ${resultado.mensaje}]` : `[Sistema: no se pudo reservar — ${resultado.mensaje}]` };
     }
     async consultarDisponibilidad(input, ctx) {
         const nombreAgente = String(input?.agente || '').trim();
@@ -322,7 +356,8 @@ ToolExecutorService = ToolExecutorService_1 = __decorate([
         producto_service_1.ProductoService,
         configuracion_cliente_service_1.ConfiguracionClienteService,
         recurso_service_1.RecursoService,
-        reservacion_service_1.ReservacionService])
+        reservacion_service_1.ReservacionService,
+        flow_whatsapp_service_1.FlowWhatsappService])
 ], ToolExecutorService);
 exports.ToolExecutorService = ToolExecutorService;
 //# sourceMappingURL=tool-executor.service.js.map

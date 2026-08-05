@@ -121,6 +121,89 @@ export class WhatsappService {
     }
   }
 
+  // ── Flows ─────────────────────────────────────────────────────
+  // Igual que Plantillas, requieren `whatsapp_business_management`. A diferencia de las
+  // plantillas, NO hay revisión humana de Meta — la validación del JSON es automática y
+  // publicar es inmediato.
+
+  /** Crea el flow en Meta en estado DRAFT. */
+  async crearFlowMeta(config: WaConfig, payload: { name: string; categories: string[]; flow_json: string }): Promise<{ id: string }> {
+    return this.apiCall('post', `${config.wabaId}/flows`, config.accessToken, payload)
+  }
+
+  /**
+   * Actualiza el flow_json de un flow que sigue en DRAFT. A diferencia del resto de
+   * llamadas, Meta exige esto como upload multipart (no JSON plano) — confirmado
+   * empíricamente el 2026-08-04, `POST /{flow_id}` con `{flow_json}` da
+   * "No properties to update has been provided in request".
+   */
+  async actualizarFlowMeta(config: WaConfig, metaFlowId: string, flowJson: string): Promise<void> {
+    const form = new FormData()
+    form.append('name', 'flow.json')
+    form.append('asset_type', 'FLOW_JSON')
+    form.append('file', new Blob([flowJson], { type: 'application/json' }), 'flow.json')
+    await axios.post(`${WA_BASE_URL}/${metaFlowId}/assets`, form, {
+      headers: { Authorization: `Bearer ${config.accessToken}` },
+    })
+  }
+
+  /** Publica el flow — ya queda disponible para mandarlo por WhatsApp. */
+  async publicarFlowMeta(config: WaConfig, metaFlowId: string): Promise<void> {
+    await this.apiCall('post', `${metaFlowId}/publish`, config.accessToken)
+  }
+
+  /** Consulta status (DRAFT/PUBLISHED/DEPRECATED) y errores de validación del JSON. */
+  async obtenerEstadoFlowMeta(config: WaConfig, metaFlowId: string): Promise<{ status: string; validation_errors?: any[] }> {
+    return this.apiCall('get', metaFlowId, config.accessToken, undefined, { fields: 'status,validation_errors' })
+  }
+
+  /** Devuelve una preview_url para ver el formulario en el navegador sin gastar un mensaje de WhatsApp. */
+  async obtenerPreviewFlowMeta(config: WaConfig, metaFlowId: string): Promise<{ preview_url: string }> {
+    const res = await this.apiCall('get', metaFlowId, config.accessToken, undefined, { fields: 'preview.invalidate(false)' })
+    return { preview_url: res.preview?.preview_url }
+  }
+
+  /** Solo funciona si el flow sigue en DRAFT — Meta no deja borrar uno ya publicado. */
+  async eliminarFlowMeta(config: WaConfig, metaFlowId: string): Promise<void> {
+    await this.apiCall('delete', metaFlowId, config.accessToken)
+  }
+
+  /** Para un flow ya publicado — lo marca obsoleto, deja de poder enviarse. */
+  async deprecarFlowMeta(config: WaConfig, metaFlowId: string): Promise<void> {
+    await this.apiCall('post', `${metaFlowId}/deprecate`, config.accessToken)
+  }
+
+  /** Manda el mensaje interactivo que dispara el flow — el cliente lo abre y llena el formulario nativo. */
+  async enviarFlow(to: string, metaFlowId: string, flowToken: string, cta: string, cuerpo: string, screenId: string, config: WaConfig): Promise<void> {
+    try {
+      await this.apiPost(config.phoneNumberId, config.accessToken, {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: to.replace(/\D/g, ''),
+        type: 'interactive',
+        interactive: {
+          type: 'flow',
+          body: { text: cuerpo },
+          action: {
+            name: 'flow',
+            parameters: {
+              flow_message_version: '3',
+              flow_token: flowToken,
+              flow_id: metaFlowId,
+              flow_cta: cta.slice(0, 20),
+              flow_action: 'navigate',
+              flow_action_payload: { screen: screenId },
+            },
+          },
+        },
+      })
+    } catch (err: any) {
+      const msg = err?.response?.data?.error?.message || err.message
+      this.logger.warn(`[WA] No se pudo enviar flow (${metaFlowId}): ${msg}`)
+      throw new Error(msg)
+    }
+  }
+
   async enviarTexto(to: string, text: string, config: WaConfig): Promise<any> {
     if (!config.accessToken || !config.phoneNumberId) {
       this.logger.error(`[WA] Envío fallido — accessToken:${!!config.accessToken} phoneNumberId:${!!config.phoneNumberId}`, '')

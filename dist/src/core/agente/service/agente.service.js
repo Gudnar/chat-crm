@@ -59,6 +59,11 @@ let AgenteService = AgenteService_1 = class AgenteService extends base_service_1
             where: { recordatorioActivo: true, activo: true, estado: constants_1.Status.ACTIVE },
         });
     }
+    async listarConRecordatorioCitaActivo() {
+        return this.agenteRepository.find({
+            where: { recordatorioCitaActivo: true, activo: true, estado: constants_1.Status.ACTIVE },
+        });
+    }
     async crear(dto, usuarioCreacion, clienteId) {
         const agente = this.agenteRepository.create({
             ...dto,

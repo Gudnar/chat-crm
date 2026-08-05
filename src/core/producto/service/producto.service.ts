@@ -47,10 +47,26 @@ export class ProductoService extends BaseService {
 
     if (soloActivos) qb.andWhere('p.activo = true')
     if (q) {
-      qb.andWhere(
-        '(p.nombre ILIKE :q OR p.marca ILIKE :q OR p.modelo ILIKE :q OR p.descripcion ILIKE :q OR p.categoria ILIKE :q)',
-        { q: `%${q}%` },
-      )
+      // ILIKE no ignora tildes — si el término de búsqueda viene con acentos correctos
+      // ("Edición") pero el dato cargado no los tiene ("Edicion", típico de una carga
+      // por Excel), una comparación directa no encuentra nada aunque el producto exista.
+      // Se compara sin acentos de ambos lados, y se separa en palabras para que no haga
+      // falta que coincidan en el mismo orden ni en el mismo campo.
+      const FROM_ACENTOS = 'áéíóúÁÉÍÓÚñÑüÜ'
+      const TO_SIN_ACENTOS = 'aeiouAEIOUnNuU'
+      const palabras = q.trim().split(/\s+/).filter(Boolean)
+      palabras.forEach((palabra, i) => {
+        const key = `q${i}`
+        const sinAcentos = palabra.normalize('NFD').replace(/[̀-ͯ]/g, '')
+        qb.andWhere(
+          `(TRANSLATE(p.nombre, :fromAcentos, :toSinAcentos) ILIKE :${key}
+            OR TRANSLATE(p.marca, :fromAcentos, :toSinAcentos) ILIKE :${key}
+            OR TRANSLATE(p.modelo, :fromAcentos, :toSinAcentos) ILIKE :${key}
+            OR TRANSLATE(p.descripcion, :fromAcentos, :toSinAcentos) ILIKE :${key}
+            OR TRANSLATE(p.categoria, :fromAcentos, :toSinAcentos) ILIKE :${key})`,
+          { [key]: `%${sinAcentos}%`, fromAcentos: FROM_ACENTOS, toSinAcentos: TO_SIN_ACENTOS },
+        )
+      })
     }
     if (categoria) qb.andWhere('LOWER(p.categoria) = LOWER(:categoria)', { categoria })
 
@@ -152,6 +168,42 @@ export class ProductoService extends BaseService {
   async buscar(clienteId: string, termino: string, categoria?: string): Promise<Producto[]> {
     const { items } = await this.listar(clienteId, termino, categoria, 1, 10, true)
     return items
+  }
+
+  /**
+   * Descuenta 1 unidad de stock — pensado para la tool `reservar_producto`, que el
+   * agente llama solo cuando ya se confirmó una venta/reserva real (nunca antes).
+   * El decremento es atómico a nivel de fila (`stock > 0` en el WHERE) para que dos
+   * reservas simultáneas del último vehículo nunca dejen el stock en negativo.
+   */
+  async reservarUnidad(clienteId: string, termino: string): Promise<{ ok: boolean; mensaje: string; producto?: Producto }> {
+    const encontrados = await this.buscar(clienteId, termino)
+    if (!encontrados.length) {
+      return { ok: false, mensaje: `No encontré ningún producto que coincida con "${termino}" en el catálogo.` }
+    }
+    if (encontrados.length > 1) {
+      const nombres = encontrados.map(p => p.nombre).join(', ')
+      return { ok: false, mensaje: `Encontré varios productos que coinciden con "${termino}" (${nombres}) — necesito el nombre exacto del modelo para reservar el correcto.` }
+    }
+
+    const producto = encontrados[0]
+    if (producto.stock == null) {
+      return { ok: false, mensaje: `"${producto.nombre}" no tiene stock cargado en el sistema — no se puede reservar automáticamente, avisá al equipo.` }
+    }
+
+    const resultado = await this.repo
+      .createQueryBuilder()
+      .update(Producto)
+      .set({ stock: () => 'stock - 1' })
+      .where('id = :id AND cliente_id = :clienteId AND stock > 0', { id: producto.id, clienteId })
+      .execute()
+
+    if (!resultado.affected) {
+      return { ok: false, mensaje: `"${producto.nombre}" no tiene stock disponible para reservar en este momento.` }
+    }
+
+    const actualizado = await this.repo.findOne({ where: { id: producto.id, clienteId } })
+    return { ok: true, mensaje: `Reservada 1 unidad de "${producto.nombre}". Stock restante: ${actualizado?.stock ?? 0}.`, producto: actualizado! }
   }
 
   formatearParaClaude(productos: Producto[]): string {

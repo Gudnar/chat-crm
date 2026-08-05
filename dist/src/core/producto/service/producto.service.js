@@ -67,7 +67,18 @@ let ProductoService = ProductoService_1 = class ProductoService extends base_ser
         if (soloActivos)
             qb.andWhere('p.activo = true');
         if (q) {
-            qb.andWhere('(p.nombre ILIKE :q OR p.marca ILIKE :q OR p.modelo ILIKE :q OR p.descripcion ILIKE :q OR p.categoria ILIKE :q)', { q: `%${q}%` });
+            const FROM_ACENTOS = 'áéíóúÁÉÍÓÚñÑüÜ';
+            const TO_SIN_ACENTOS = 'aeiouAEIOUnNuU';
+            const palabras = q.trim().split(/\s+/).filter(Boolean);
+            palabras.forEach((palabra, i) => {
+                const key = `q${i}`;
+                const sinAcentos = palabra.normalize('NFD').replace(/[̀-ͯ]/g, '');
+                qb.andWhere(`(TRANSLATE(p.nombre, :fromAcentos, :toSinAcentos) ILIKE :${key}
+            OR TRANSLATE(p.marca, :fromAcentos, :toSinAcentos) ILIKE :${key}
+            OR TRANSLATE(p.modelo, :fromAcentos, :toSinAcentos) ILIKE :${key}
+            OR TRANSLATE(p.descripcion, :fromAcentos, :toSinAcentos) ILIKE :${key}
+            OR TRANSLATE(p.categoria, :fromAcentos, :toSinAcentos) ILIKE :${key})`, { [key]: `%${sinAcentos}%`, fromAcentos: FROM_ACENTOS, toSinAcentos: TO_SIN_ACENTOS });
+            });
         }
         if (categoria)
             qb.andWhere('LOWER(p.categoria) = LOWER(:categoria)', { categoria });
@@ -154,6 +165,31 @@ let ProductoService = ProductoService_1 = class ProductoService extends base_ser
     async buscar(clienteId, termino, categoria) {
         const { items } = await this.listar(clienteId, termino, categoria, 1, 10, true);
         return items;
+    }
+    async reservarUnidad(clienteId, termino) {
+        const encontrados = await this.buscar(clienteId, termino);
+        if (!encontrados.length) {
+            return { ok: false, mensaje: `No encontré ningún producto que coincida con "${termino}" en el catálogo.` };
+        }
+        if (encontrados.length > 1) {
+            const nombres = encontrados.map(p => p.nombre).join(', ');
+            return { ok: false, mensaje: `Encontré varios productos que coinciden con "${termino}" (${nombres}) — necesito el nombre exacto del modelo para reservar el correcto.` };
+        }
+        const producto = encontrados[0];
+        if (producto.stock == null) {
+            return { ok: false, mensaje: `"${producto.nombre}" no tiene stock cargado en el sistema — no se puede reservar automáticamente, avisá al equipo.` };
+        }
+        const resultado = await this.repo
+            .createQueryBuilder()
+            .update(producto_entity_1.Producto)
+            .set({ stock: () => 'stock - 1' })
+            .where('id = :id AND cliente_id = :clienteId AND stock > 0', { id: producto.id, clienteId })
+            .execute();
+        if (!resultado.affected) {
+            return { ok: false, mensaje: `"${producto.nombre}" no tiene stock disponible para reservar en este momento.` };
+        }
+        const actualizado = await this.repo.findOne({ where: { id: producto.id, clienteId } });
+        return { ok: true, mensaje: `Reservada 1 unidad de "${producto.nombre}". Stock restante: ${actualizado?.stock ?? 0}.`, producto: actualizado };
     }
     formatearParaClaude(productos) {
         if (!productos.length) {

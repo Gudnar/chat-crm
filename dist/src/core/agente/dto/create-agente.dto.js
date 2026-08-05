@@ -96,6 +96,32 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateAgenteDto.prototype, "recordatorioMensaje", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false, description: 'Si está activo, avisa al cliente N horas antes de una llamada ya agendada con agendar_cita' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateAgenteDto.prototype, "recordatorioCitaActivo", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ example: 2, required: false }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
+    (0, class_validator_1.Max)(72),
+    __metadata("design:type", Number)
+], CreateAgenteDto.prototype, "recordatorioCitaHoras", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateAgenteDto.prototype, "recordatorioCitaMensaje", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false, description: 'Plantilla aprobada a usar si el aviso cae fuera de la ventana de 24h' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateAgenteDto.prototype, "recordatorioCitaPlantillaId", void 0);
 exports.CreateAgenteDto = CreateAgenteDto;
 class UpdateAgenteDto extends CreateAgenteDto {
 }

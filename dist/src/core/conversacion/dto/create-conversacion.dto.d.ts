@@ -31,6 +31,15 @@ export declare class AgregarMensajeDto {
         nombre?: string;
         direccion?: string;
     };
+    flow?: {
+        metaFlowId: string;
+        flowToken: string;
+        cta: string;
+    };
+    respuestaFlow?: {
+        nombre: string;
+        respuestas: Record<string, string>;
+    };
 }
 export declare class TestAgenteDto {
     agenteId: string;

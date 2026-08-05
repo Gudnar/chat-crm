@@ -97,6 +97,10 @@ __decorate([
     (0, typeorm_1.Column)({ name: 'resultado', length: 30, nullable: true }),
     __metadata("design:type", String)
 ], Reserva.prototype, "resultado", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'recordatorio_enviado', type: 'boolean', default: false }),
+    __metadata("design:type", Boolean)
+], Reserva.prototype, "recordatorioEnviado", void 0);
 Reserva = __decorate([
     (0, typeorm_1.Entity)({ name: 'reserva', schema: process.env.DB_SCHEMA || 'public' }),
     (0, typeorm_1.Index)(['agenteId', 'fechaInicio']),

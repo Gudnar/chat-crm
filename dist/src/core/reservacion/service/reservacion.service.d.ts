@@ -39,6 +39,8 @@ export declare class ReservacionService extends BaseService {
     private aFechaYHoraLocal;
     private validarDentroDeHorario;
     private validarSinSolapamiento;
+    listarPendientesParaRecordatorioCita(agenteId: string, horasAntes: number): Promise<Reserva[]>;
+    marcarRecordatorioCitaEnviado(id: string): Promise<void>;
     private seSolapan;
     private generarCodigoReserva;
 }

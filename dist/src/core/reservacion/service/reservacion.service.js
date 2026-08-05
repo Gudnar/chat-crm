@@ -233,6 +233,20 @@ let ReservacionService = ReservacionService_1 = class ReservacionService extends
             throw new common_1.ConflictException('El agente ya tiene una reserva confirmada que se solapa con ese horario.');
         }
     }
+    async listarPendientesParaRecordatorioCita(agenteId, horasAntes) {
+        const ahora = Date.now();
+        const limite = ahora + horasAntes * 60 * 60 * 1000;
+        const candidatas = await this.reservaRepository.find({
+            where: { agenteId, estadoReserva: constants_1.EstadoReserva.CONFIRMADA, recordatorioEnviado: false, estado: constants_1.Status.ACTIVE },
+        });
+        return candidatas.filter(r => {
+            const inicio = new Date(r.fechaInicio).getTime();
+            return inicio > ahora && inicio <= limite;
+        });
+    }
+    async marcarRecordatorioCitaEnviado(id) {
+        await this.reservaRepository.update(id, { recordatorioEnviado: true });
+    }
     seSolapan(inicio1, fin1, inicio2, fin2) {
         return inicio1 < fin2 && inicio2 < fin1;
     }

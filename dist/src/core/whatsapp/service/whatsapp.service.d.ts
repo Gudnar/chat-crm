@@ -31,6 +31,25 @@ export declare class WhatsappService {
     }>;
     eliminarPlantillaMeta(config: WaConfig, nombre: string): Promise<void>;
     enviarPlantilla(to: string, nombrePlantilla: string, idioma: string, componentesEnvio: any[], config: WaConfig): Promise<void>;
+    crearFlowMeta(config: WaConfig, payload: {
+        name: string;
+        categories: string[];
+        flow_json: string;
+    }): Promise<{
+        id: string;
+    }>;
+    actualizarFlowMeta(config: WaConfig, metaFlowId: string, flowJson: string): Promise<void>;
+    publicarFlowMeta(config: WaConfig, metaFlowId: string): Promise<void>;
+    obtenerEstadoFlowMeta(config: WaConfig, metaFlowId: string): Promise<{
+        status: string;
+        validation_errors?: any[];
+    }>;
+    obtenerPreviewFlowMeta(config: WaConfig, metaFlowId: string): Promise<{
+        preview_url: string;
+    }>;
+    eliminarFlowMeta(config: WaConfig, metaFlowId: string): Promise<void>;
+    deprecarFlowMeta(config: WaConfig, metaFlowId: string): Promise<void>;
+    enviarFlow(to: string, metaFlowId: string, flowToken: string, cta: string, cuerpo: string, screenId: string, config: WaConfig): Promise<void>;
     enviarTexto(to: string, text: string, config: WaConfig): Promise<any>;
     descargarMedia(mediaId: string, config: WaConfig): Promise<{
         buffer: Buffer;

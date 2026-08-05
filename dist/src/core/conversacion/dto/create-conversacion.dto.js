@@ -89,6 +89,18 @@ __decorate([
     (0, class_validator_1.IsObject)(),
     __metadata("design:type", Object)
 ], AgregarMensajeDto.prototype, "ubicacion", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false, description: 'Formulario (Flow) enviado al cliente' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsObject)(),
+    __metadata("design:type", Object)
+], AgregarMensajeDto.prototype, "flow", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false, description: 'Respuesta del formulario (Flow) completada por el cliente' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsObject)(),
+    __metadata("design:type", Object)
+], AgregarMensajeDto.prototype, "respuestaFlow", void 0);
 exports.AgregarMensajeDto = AgregarMensajeDto;
 class TestAgenteDto {
 }

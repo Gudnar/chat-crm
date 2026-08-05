@@ -12,6 +12,10 @@ export declare class CreateAgenteDto {
     recordatorioActivo?: boolean;
     recordatorioHoras?: number;
     recordatorioMensaje?: string;
+    recordatorioCitaActivo?: boolean;
+    recordatorioCitaHoras?: number;
+    recordatorioCitaMensaje?: string;
+    recordatorioCitaPlantillaId?: string;
 }
 export declare class UpdateAgenteDto extends CreateAgenteDto {
     activo?: boolean;

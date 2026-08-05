@@ -76,6 +76,22 @@ export class Agente extends AuditoriaEntity {
   @Column({ name: 'recordatorio_mensaje', type: 'text', nullable: true })
   recordatorioMensaje?: string
 
+  // ── Recordatorio de cita agendada: avisa al cliente N horas antes de una llamada
+  // ya confirmada con agendar_cita (ver RecordatorioCitaService). Si al momento de
+  // mandar el aviso ya pasaron 24h desde el último mensaje del cliente, Meta exige
+  // una plantilla aprobada en vez de texto libre — de ahí recordatorioCitaPlantillaId. ──
+  @Column({ name: 'recordatorio_cita_activo', type: 'boolean', default: false })
+  recordatorioCitaActivo: boolean
+
+  @Column({ name: 'recordatorio_cita_horas', type: 'int', default: 2 })
+  recordatorioCitaHoras: number
+
+  @Column({ name: 'recordatorio_cita_mensaje', type: 'text', nullable: true })
+  recordatorioCitaMensaje?: string
+
+  @Column({ name: 'recordatorio_cita_plantilla_id', type: 'bigint', nullable: true })
+  recordatorioCitaPlantillaId?: string | null
+
   @Column({ name: 'activo', type: 'boolean', default: true })
   activo: boolean
 

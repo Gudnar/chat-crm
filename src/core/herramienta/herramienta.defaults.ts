@@ -62,6 +62,16 @@ export const HERRAMIENTAS_DEFAULT: Partial<Herramienta>[] = [
     ejemplo: 'buscar_producto({ termino: "zapatillas Nike", categoria: "calzado" })',
   },
   {
+    nombre: 'reservar_producto',
+    label: 'Reservar Producto (descuenta stock)',
+    descripcion: 'Descuenta 1 unidad de stock de un producto. Úsala SOLO cuando ya se confirmó una venta o reserva real con el cliente (ej. junto con agendar_cita o escalar_agente) — NUNCA la uses solo porque el cliente preguntó por un producto o mostró interés. Si el producto no tiene stock disponible, te avisa y no descuenta nada — en ese caso no le digas al cliente que quedó reservado.',
+    parametros: [
+      { nombre: 'termino', tipo: 'string', descripcion: 'Nombre exacto del producto/modelo a reservar (el mismo que devolvió buscar_producto)', requerido: true },
+    ] as any,
+    activa: true, autoConfirmar: true, confianzaMinima: 70, color: '#ef4444', icono: 'package-minus',
+    ejemplo: 'reservar_producto({ termino: "Toyota BZ5" })',
+  },
+  {
     nombre: 'enviar_catalogo',
     label: 'Enviar Catálogo PDF',
     descripcion: 'Envía el catálogo completo en PDF al chat del cliente. Úsala solo cuando pida explícitamente el catálogo, la lista completa o un archivo con todos los productos. Requiere que el cliente tenga CATALOGO_PDF_URL configurado.',
@@ -143,5 +153,16 @@ export const HERRAMIENTAS_DEFAULT: Partial<Herramienta>[] = [
     ] as any,
     activa: true, autoConfirmar: true, confianzaMinima: 60, color: '#22c55e', icono: 'map-pin',
     ejemplo: 'solicitar_ubicacion({ mensaje: "Para calcular el envío, ¿podrías compartir tu ubicación?" })',
+  },
+  {
+    nombre: 'iniciar_flow',
+    label: 'Iniciar Formulario (Flow)',
+    descripcion: 'Manda un formulario nativo de WhatsApp (varios campos en una sola pantalla: texto, fecha, opciones) en vez de pedir los datos uno por uno en la conversación. Úsala cuando necesites capturar varios datos estructurados de una sola vez (ej. reserva, encuesta, datos de contacto) y exista un flow con ese nombre ya publicado. La respuesta del cliente te llega como un mensaje con los valores que completó en cada campo.',
+    parametros: [
+      { nombre: 'nombre_flow', tipo: 'string', descripcion: 'Nombre exacto del flow a enviar (lo configura el administrador en el módulo Flows)', requerido: true },
+      { nombre: 'mensaje', tipo: 'string', descripcion: 'Texto que acompaña al botón que abre el formulario', requerido: true },
+    ] as any,
+    activa: true, autoConfirmar: true, confianzaMinima: 60, color: '#ec4899', icono: 'file-text',
+    ejemplo: 'iniciar_flow({ nombre_flow: "reserva_spa", mensaje: "Completá este formulario para tu reserva:" })',
   },
 ]

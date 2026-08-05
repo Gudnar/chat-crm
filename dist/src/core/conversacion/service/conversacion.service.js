@@ -75,6 +75,8 @@ let ConversacionService = ConversacionService_1 = class ConversacionService exte
             ...(dto.enlace ? { enlace: dto.enlace } : {}),
             ...(dto.pidioUbicacion ? { pidioUbicacion: true } : {}),
             ...(dto.ubicacion ? { ubicacion: dto.ubicacion } : {}),
+            ...(dto.flow ? { flow: dto.flow } : {}),
+            ...(dto.respuestaFlow ? { respuestaFlow: dto.respuestaFlow } : {}),
         };
         conv.mensajes = [...(conv.mensajes || []), nuevoMensaje];
         conv.totalMensajes = conv.mensajes.length;

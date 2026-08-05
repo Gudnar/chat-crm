@@ -44,6 +44,8 @@ export class Conversacion extends AuditoriaEntity {
     enlace?: { texto: string; url: string }
     pidioUbicacion?: boolean
     ubicacion?: { latitud: number; longitud: number; nombre?: string; direccion?: string }
+    flow?: { metaFlowId: string; flowToken: string; cta: string }
+    respuestaFlow?: { nombre: string; respuestas: Record<string, string> }
   }>
 
   @Column({ name: 'total_mensajes', type: 'int', default: 0 })

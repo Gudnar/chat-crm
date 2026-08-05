@@ -8,7 +8,7 @@ import { ConversacionService } from '../../conversacion/service/conversacion.ser
 import { AgenteService } from '../../agente/service/agente.service'
 import { ConfiguracionClienteService } from '../../cliente/service/configuracion-cliente.service'
 import { HerramientaService } from '../../herramienta/service/herramienta.service'
-import { ToolExecutorService, ToolDocumento, ToolOpciones, ToolBotonLink, ToolSolicitudUbicacion } from '../../herramienta/service/tool-executor.service'
+import { ToolExecutorService, ToolDocumento, ToolOpciones, ToolBotonLink, ToolSolicitudUbicacion, ToolFlow } from '../../herramienta/service/tool-executor.service'
 import { BaseConocimientoService } from '../../base-conocimiento/service/base-conocimiento.service'
 import { WaWebhookMessage } from '../dto/whatsapp.dto'
 import { USUARIO_SISTEMA, TipoAgente } from '../../../common/constants'
@@ -32,6 +32,7 @@ interface LlamarClaudeResult {
   opciones: ToolOpciones[]
   botonesLink: ToolBotonLink[]
   solicitudesUbicacion: ToolSolicitudUbicacion[]
+  flows: ToolFlow[]
 }
 
 @Injectable()
@@ -101,7 +102,8 @@ export class WhatsappWebhookService {
       }
 
       const ubicacion = this.extraerUbicacion(rawMessage)
-      await this.conversacionService.agregarMensaje(conversacion.id, { role: 'user', content: textoUsuario, adjunto, ubicacion })
+      const respuestaFlow = this.extraerRespuestaFlow(rawMessage)
+      await this.conversacionService.agregarMensaje(conversacion.id, { role: 'user', content: textoUsuario, adjunto, ubicacion, respuestaFlow })
 
       // Canal atendido directamente por una persona del equipo (no un agente IA):
       // el mensaje queda guardado y asignado para que el humano responda desde el
@@ -119,7 +121,7 @@ export class WhatsappWebhookService {
         .slice(-MAX_HISTORY_MESSAGES)
         .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }))
 
-      const { respuesta, textosPrevios, imagenes, documentos, audios, videos, opciones, botonesLink, solicitudesUbicacion } = await this.llamarClaude(agente, historial, clienteId, conversacion.id)
+      const { respuesta, textosPrevios, imagenes, documentos, audios, videos, opciones, botonesLink, solicitudesUbicacion, flows } = await this.llamarClaude(agente, historial, clienteId, conversacion.id)
       if (!respuesta && textosPrevios.length === 0) return
 
       // Texto escrito por Claude ANTES de invocar una tool (ej. el checklist previo
@@ -189,7 +191,18 @@ export class WhatsappWebhookService {
         })
       }
 
-      this.logger.log(`[WA] Respuesta enviada a ${from} (${imagenes.length} imágenes, ${documentos.length} documentos, ${audios.length} audios, ${videos.length} videos, ${opciones.length} preguntas con opciones, ${botonesLink.length} botones link, ${solicitudesUbicacion.length} solicitudes de ubicación)`)
+      // Formularios nativos (herramienta iniciar_flow) — la respuesta llega después,
+      // por webhook, como interactive.nfm_reply (ver extraerRespuestaFlow).
+      for (const flow of flows) {
+        await this.waService.enviarFlow(from, flow.metaFlowId, flow.flowToken, flow.cta, flow.mensaje, flow.screenId, config)
+        await this.conversacionService.agregarMensaje(conversacion.id, {
+          role: 'assistant',
+          content: flow.mensaje,
+          flow: { metaFlowId: flow.metaFlowId, flowToken: flow.flowToken, cta: flow.cta },
+        })
+      }
+
+      this.logger.log(`[WA] Respuesta enviada a ${from} (${imagenes.length} imágenes, ${documentos.length} documentos, ${audios.length} audios, ${videos.length} videos, ${opciones.length} preguntas con opciones, ${botonesLink.length} botones link, ${solicitudesUbicacion.length} solicitudes de ubicación, ${flows.length} flows)`)
     } catch (err: any) {
       this.logger.error(`[WA] Error procesando mensaje de ${from}: ${err.message}`)
     }
@@ -201,6 +214,12 @@ export class WhatsappWebhookService {
     if (msg.type === 'text') return msg.text?.body || null
     if (msg.type === 'button') return msg.button?.text || null
     if (msg.type === 'interactive') {
+      if (msg.interactive?.type === 'nfm_reply') {
+        const respuestaFlow = this.extraerRespuestaFlow(msg)
+        if (!respuestaFlow) return '[Formulario completado, pero no se pudo leer el contenido]'
+        const resumen = Object.entries(respuestaFlow.respuestas).map(([campo, valor]) => `${campo}: ${valor}`).join(', ')
+        return `[Formulario "${respuestaFlow.nombre}" completado: ${resumen}]`
+      }
       return msg.interactive?.button_reply?.title || msg.interactive?.list_reply?.title || null
     }
     // Antes estos 3 tipos se descartaban en silencio: el cliente mandaba una foto,
@@ -222,6 +241,18 @@ export class WhatsappWebhookService {
       longitud: msg.location.longitude,
       nombre: msg.location.name,
       direccion: msg.location.address,
+    }
+  }
+
+  private extraerRespuestaFlow(msg: WaWebhookMessage): { nombre: string; respuestas: Record<string, string> } | undefined {
+    const nfm = msg.interactive?.nfm_reply
+    if (msg.type !== 'interactive' || msg.interactive?.type !== 'nfm_reply' || !nfm) return undefined
+    try {
+      const datos = JSON.parse(nfm.response_json || '{}')
+      const { flow_token: _flowToken, ...respuestas } = datos
+      return { nombre: nfm.name || 'formulario', respuestas }
+    } catch {
+      return undefined
     }
   }
 
@@ -313,7 +344,7 @@ export class WhatsappWebhookService {
     const apiKey = apiKeyConfig?.valor
     if (!apiKey || apiKey.includes('•')) {
       this.logger.error('[WA] ANTHROPIC_API_KEY no configurada para este cliente')
-      return { respuesta: null, textosPrevios: [], imagenes: [], documentos: [], audios: [], videos: [], opciones: [], botonesLink: [], solicitudesUbicacion: [] }
+      return { respuesta: null, textosPrevios: [], imagenes: [], documentos: [], audios: [], videos: [], opciones: [], botonesLink: [], solicitudesUbicacion: [], flows: [] }
     }
 
     // Construir system prompt: instrucciones del agente + base de conocimiento
@@ -354,6 +385,7 @@ export class WhatsappWebhookService {
     const pendingOpciones: ToolOpciones[] = []
     const pendingBotonesLink: ToolBotonLink[] = []
     const pendingSolicitudesUbicacion: ToolSolicitudUbicacion[] = []
+    const pendingFlows: ToolFlow[] = []
     const textosPrevios: string[] = []
     const herramientasEjecutadas = new Set<string>()
     let reintentoConfirmacionForzado = false
@@ -426,7 +458,7 @@ export class WhatsappWebhookService {
             this.logger.error(`[WA] POSIBLE CITA FANTASMA: el agente ${agente.id} confirmó una cita en texto sin ejecutar agendar_cita (conversación ${conversacionId})`)
           }
 
-          return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos, opciones: pendingOpciones, botonesLink: pendingBotonesLink, solicitudesUbicacion: pendingSolicitudesUbicacion }
+          return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos, opciones: pendingOpciones, botonesLink: pendingBotonesLink, solicitudesUbicacion: pendingSolicitudesUbicacion, flows: pendingFlows }
         }
 
         if (stop_reason === 'tool_use') {
@@ -482,6 +514,10 @@ export class WhatsappWebhookService {
               pendingSolicitudesUbicacion.push(resultado.solicitudUbicacion)
             }
 
+            if (resultado.flow) {
+              pendingFlows.push(resultado.flow)
+            }
+
             toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultado.texto })
           }
 
@@ -490,14 +526,14 @@ export class WhatsappWebhookService {
         }
 
         const textBlock = (content as any[])?.find((b: any) => b.type === 'text')
-        return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos, opciones: pendingOpciones, botonesLink: pendingBotonesLink, solicitudesUbicacion: pendingSolicitudesUbicacion }
+        return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos, opciones: pendingOpciones, botonesLink: pendingBotonesLink, solicitudesUbicacion: pendingSolicitudesUbicacion, flows: pendingFlows }
       }
 
       this.logger.warn('[WA] Se alcanzó el límite de iteraciones de tool_use')
-      return { respuesta: null, textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos, opciones: pendingOpciones, botonesLink: pendingBotonesLink, solicitudesUbicacion: pendingSolicitudesUbicacion }
+      return { respuesta: null, textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos, opciones: pendingOpciones, botonesLink: pendingBotonesLink, solicitudesUbicacion: pendingSolicitudesUbicacion, flows: pendingFlows }
     } catch (err: any) {
       this.logger.error(`[WA] Error llamando a Claude: ${err?.response?.data?.error?.message || err.message}`)
-      return { respuesta: null, textosPrevios, imagenes: [], documentos: [], audios: [], videos: [], opciones: [], botonesLink: [], solicitudesUbicacion: [] }
+      return { respuesta: null, textosPrevios, imagenes: [], documentos: [], audios: [], videos: [], opciones: [], botonesLink: [], solicitudesUbicacion: [], flows: [] }
     }
   }
 

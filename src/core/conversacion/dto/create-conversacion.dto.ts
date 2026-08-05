@@ -63,6 +63,16 @@ export class AgregarMensajeDto {
   @IsOptional()
   @IsObject()
   ubicacion?: { latitud: number; longitud: number; nombre?: string; direccion?: string }
+
+  @ApiProperty({ required: false, description: 'Formulario (Flow) enviado al cliente' })
+  @IsOptional()
+  @IsObject()
+  flow?: { metaFlowId: string; flowToken: string; cta: string }
+
+  @ApiProperty({ required: false, description: 'Respuesta del formulario (Flow) completada por el cliente' })
+  @IsOptional()
+  @IsObject()
+  respuestaFlow?: { nombre: string; respuestas: Record<string, string> }
 }
 
 export class TestAgenteDto {

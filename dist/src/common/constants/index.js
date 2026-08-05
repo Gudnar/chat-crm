@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.CategoriaPlantillaWhatsapp = exports.EstadoPlantillaWhatsapp = exports.EstadoReserva = exports.OrigenOportunidad = exports.ESTADOS_OPORTUNIDAD_FINALES = exports.EstadoOportunidad = exports.EstadoConversacion = exports.ModoAgente = exports.TipoActividadAgente = exports.DisponibilidadAgente = exports.TipoAgente = exports.Roles = exports.Configurations = exports.USUARIO_NORMAL = exports.USUARIO_SISTEMA = exports.Transacccion = exports.Status = exports.SWAGGER_API_ROOT = exports.SWAGGER_API_CURRENT_VERSION = exports.SWAGGER_API_DESCRIPTION = exports.SWAGGER_API_NAME = void 0;
+exports.CategoriaFlowWhatsapp = exports.EstadoFlowWhatsapp = exports.CategoriaPlantillaWhatsapp = exports.EstadoPlantillaWhatsapp = exports.EstadoReserva = exports.OrigenOportunidad = exports.ESTADOS_OPORTUNIDAD_FINALES = exports.EstadoOportunidad = exports.EstadoConversacion = exports.ModoAgente = exports.TipoActividadAgente = exports.DisponibilidadAgente = exports.TipoAgente = exports.Roles = exports.Configurations = exports.USUARIO_NORMAL = exports.USUARIO_SISTEMA = exports.Transacccion = exports.Status = exports.SWAGGER_API_ROOT = exports.SWAGGER_API_CURRENT_VERSION = exports.SWAGGER_API_DESCRIPTION = exports.SWAGGER_API_NAME = void 0;
 exports.SWAGGER_API_NAME = 'IDE-IA API';
 exports.SWAGGER_API_DESCRIPTION = 'API REST para la plataforma de gestión de Agentes IA con Anthropic Claude';
 exports.SWAGGER_API_CURRENT_VERSION = '1.0.0';
@@ -100,5 +100,21 @@ exports.CategoriaPlantillaWhatsapp = {
     MARKETING: 'MARKETING',
     UTILITY: 'UTILITY',
     AUTHENTICATION: 'AUTHENTICATION',
+};
+exports.EstadoFlowWhatsapp = {
+    BORRADOR: 'borrador',
+    PUBLICADO: 'publicado',
+    ERROR_VALIDACION: 'error_validacion',
+    OBSOLETO: 'obsoleto',
+};
+exports.CategoriaFlowWhatsapp = {
+    SIGN_UP: 'SIGN_UP',
+    SIGN_IN: 'SIGN_IN',
+    APPOINTMENT_BOOKING: 'APPOINTMENT_BOOKING',
+    LEAD_GENERATION: 'LEAD_GENERATION',
+    CONTACT_US: 'CONTACT_US',
+    CUSTOMER_SUPPORT: 'CUSTOMER_SUPPORT',
+    SURVEY: 'SURVEY',
+    OTHER: 'OTHER',
 };
 //# sourceMappingURL=index.js.map

@@ -114,3 +114,21 @@ export const CategoriaPlantillaWhatsapp = {
   UTILITY: 'UTILITY',
   AUTHENTICATION: 'AUTHENTICATION',
 }
+
+export const EstadoFlowWhatsapp = {
+  BORRADOR: 'borrador',
+  PUBLICADO: 'publicado',
+  ERROR_VALIDACION: 'error_validacion',
+  OBSOLETO: 'obsoleto',
+}
+
+export const CategoriaFlowWhatsapp = {
+  SIGN_UP: 'SIGN_UP',
+  SIGN_IN: 'SIGN_IN',
+  APPOINTMENT_BOOKING: 'APPOINTMENT_BOOKING',
+  LEAD_GENERATION: 'LEAD_GENERATION',
+  CONTACT_US: 'CONTACT_US',
+  CUSTOMER_SUPPORT: 'CUSTOMER_SUPPORT',
+  SURVEY: 'SURVEY',
+  OTHER: 'OTHER',
+}

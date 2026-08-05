@@ -6,7 +6,8 @@ import { ConfiguracionClienteService } from '../../cliente/service/configuracion
 import { RecursoService } from '../../recurso/service/recurso.service'
 import { Recurso, TipoRecurso } from '../../recurso/entity/recurso.entity'
 import { ReservacionService } from '../../reservacion/service/reservacion.service'
-import { USUARIO_SISTEMA } from '../../../common/constants'
+import { FlowWhatsappService } from '../../whatsapp/service/flow-whatsapp.service'
+import { EstadoFlowWhatsapp, USUARIO_SISTEMA } from '../../../common/constants'
 import { fechaHoraBoliviaAUtc } from '../../../common/lib/fecha-bolivia.util'
 
 export interface ToolContexto {
@@ -35,6 +36,14 @@ export interface ToolSolicitudUbicacion {
   mensaje: string
 }
 
+export interface ToolFlow {
+  mensaje: string
+  metaFlowId: string
+  flowToken: string
+  cta: string
+  screenId: string
+}
+
 export interface ToolResult {
   texto: string
   imagenes?: string[]
@@ -44,6 +53,7 @@ export interface ToolResult {
   opciones?: ToolOpciones
   botonLink?: ToolBotonLink
   solicitudUbicacion?: ToolSolicitudUbicacion
+  flow?: ToolFlow
 }
 
 @Injectable()
@@ -56,6 +66,7 @@ export class ToolExecutorService {
     private readonly confClienteService: ConfiguracionClienteService,
     private readonly recursoService: RecursoService,
     private readonly reservacionService: ReservacionService,
+    private readonly flowWhatsappService: FlowWhatsappService,
   ) {}
 
   async ejecutar(nombre: string, input: Record<string, any>, contexto: ToolContexto): Promise<ToolResult> {
@@ -75,6 +86,8 @@ export class ToolExecutorService {
         case 'preguntar_opciones': return await this.preguntarOpciones(input, contexto)
         case 'enviar_boton_link': return await this.enviarBotonLink(input, contexto)
         case 'solicitar_ubicacion': return await this.solicitarUbicacion(input, contexto)
+        case 'iniciar_flow':        return await this.iniciarFlow(input, contexto)
+        case 'reservar_producto':   return await this.reservarProducto(input, contexto)
         default:
           this.logger.warn(`[Tool] Herramienta desconocida: ${nombre}`)
           return { texto: `Herramienta "${nombre}" no está implementada.` }
@@ -152,6 +165,31 @@ export class ToolExecutorService {
     }
   }
 
+  private async iniciarFlow(input: any, ctx: ToolContexto): Promise<ToolResult> {
+    const mensaje = String(input?.mensaje || '').trim()
+    const nombreFlow = String(input?.nombre_flow || '').trim().toLowerCase()
+    if (!mensaje || !nombreFlow) {
+      return { texto: '[Sistema: iniciar_flow necesita nombre_flow y mensaje. No se envió nada.]' }
+    }
+
+    const flows = await this.flowWhatsappService.listar(ctx.clienteId)
+    const flow = flows.find(f => f.nombre === nombreFlow && f.estadoFlow === EstadoFlowWhatsapp.PUBLICADO)
+    if (!flow) {
+      return { texto: `[Sistema: no existe un flow publicado con el nombre "${nombreFlow}". No se envió nada — avisale al cliente que hubo un problema y seguí por texto.]` }
+    }
+
+    return {
+      texto: `[Sistema: se le mandó al cliente el formulario "${flow.nombre}". Espera a que lo complete y lo mande — no inventes ni asumas sus respuestas.]`,
+      flow: {
+        mensaje,
+        metaFlowId: flow.metaFlowId!,
+        flowToken: `${ctx.conversacionId}-${Date.now()}`,
+        cta: flow.cta,
+        screenId: this.flowWhatsappService.obtenerScreenId(),
+      },
+    }
+  }
+
   private async crearNota(input: any, ctx: ToolContexto): Promise<ToolResult> {
     await this.conversacionService.agregarNota(ctx.conversacionId, input.nota)
     return { texto: `Nota interna creada: ${input.nota}` }
@@ -174,6 +212,16 @@ export class ToolExecutorService {
     }
 
     return { texto, imagenes }
+  }
+
+  /** Descuenta 1 unidad de stock — solo cuando ya se confirmó una venta/reserva real, nunca antes. */
+  private async reservarProducto(input: any, ctx: ToolContexto): Promise<ToolResult> {
+    const termino = String(input?.termino || '').trim()
+    if (!termino) {
+      return { texto: '[Sistema: reservar_producto necesita el término/nombre del producto. No se reservó nada.]' }
+    }
+    const resultado = await this.productoService.reservarUnidad(ctx.clienteId, termino)
+    return { texto: resultado.ok ? `[Sistema: ${resultado.mensaje}]` : `[Sistema: no se pudo reservar — ${resultado.mensaje}]` }
   }
 
   private async consultarDisponibilidad(input: any, ctx: ToolContexto): Promise<ToolResult> {
