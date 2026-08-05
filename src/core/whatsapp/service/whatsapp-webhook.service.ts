@@ -467,15 +467,21 @@ export class WhatsappWebhookService {
           // El modelo puede escribir texto (ej. el checklist de beneficios) en la MISMA
           // respuesta donde decide invocar una tool. Sin esto, ese texto se quedaba
           // solo en el historial interno y nunca llegaba al cliente de WhatsApp.
+          // Se acumula aparte (no directo en textosPrevios) porque a veces ese texto es
+          // el mismo saludo/pregunta que ya va dentro del cuerpo de preguntar_opciones /
+          // solicitar_ubicacion / iniciar_flow — el filtro de duplicados de abajo lo
+          // descarta en ese caso para no mandar el mismo mensaje dos veces seguidas.
+          const textosEsteTurno: string[] = []
           for (const block of content as any[]) {
             if (block.type === 'text' && block.text?.trim()) {
               const limpio = this.sanitizarRespuesta(block.text, tools)
-              if (limpio) textosPrevios.push(limpio)
+              if (limpio) textosEsteTurno.push(limpio)
             }
           }
 
           const toolResults: any[] = []
           let debePausarTurno = false
+          const cuerposPausaEsteTurno: string[] = []
           for (const block of content as any[]) {
             if (block.type !== 'tool_use') continue
 
@@ -505,6 +511,7 @@ export class WhatsappWebhookService {
 
             if (resultado.opciones) {
               pendingOpciones.push(resultado.opciones)
+              cuerposPausaEsteTurno.push(resultado.opciones.pregunta)
               debePausarTurno = true
             }
 
@@ -514,15 +521,21 @@ export class WhatsappWebhookService {
 
             if (resultado.solicitudUbicacion) {
               pendingSolicitudesUbicacion.push(resultado.solicitudUbicacion)
+              cuerposPausaEsteTurno.push(resultado.solicitudUbicacion.mensaje)
               debePausarTurno = true
             }
 
             if (resultado.flow) {
               pendingFlows.push(resultado.flow)
+              cuerposPausaEsteTurno.push(resultado.flow.mensaje)
               debePausarTurno = true
             }
 
             toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: resultado.texto })
+          }
+
+          for (const texto of textosEsteTurno) {
+            if (!this.esTextoDuplicadoDe(texto, cuerposPausaEsteTurno)) textosPrevios.push(texto)
           }
 
           // preguntar_opciones / solicitar_ubicacion / iniciar_flow le ceden el turno al
@@ -584,5 +597,33 @@ export class WhatsappWebhookService {
     limpio = limpio.replace(/[ \t]{2,}/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
 
     return limpio || null
+  }
+
+  private normalizarParaComparar(texto: string): string {
+    return texto
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
+  /**
+   * Detecta si `texto` (un bloque de texto suelto que acompaña a un tool_use) es en
+   * esencia el mismo mensaje que el cuerpo de una herramienta que pausa el turno
+   * (pregunta de preguntar_opciones, mensaje de solicitar_ubicacion/iniciar_flow).
+   * El caso real: el modelo saluda en un bloque de texto Y repite el mismo saludo
+   * dentro del parámetro `pregunta`, y el cliente ve el saludo dos veces seguidas.
+   */
+  private esTextoDuplicadoDe(texto: string, cuerpos: string[]): boolean {
+    const norm = this.normalizarParaComparar(texto)
+    if (!norm) return false
+    return cuerpos.some((cuerpo) => {
+      if (!cuerpo) return false
+      const normCuerpo = this.normalizarParaComparar(cuerpo)
+      if (!normCuerpo) return false
+      return norm === normCuerpo || normCuerpo.includes(norm) || norm.includes(normCuerpo)
+    })
   }
 }
