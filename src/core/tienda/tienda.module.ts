@@ -14,10 +14,11 @@ import { ClienteModule } from '../cliente/cliente.module'
 import { ConversacionModule } from '../conversacion/conversacion.module'
 import { WhatsappModule } from '../whatsapp/whatsapp.module'
 import { SucursalModule } from '../sucursal/sucursal.module'
+import { Sucursal } from '../sucursal/entity/sucursal.entity'
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ArticuloTienda, CarritoTienda, CategoriaTienda, PromocionTienda, ArticuloSucursal]),
+    TypeOrmModule.forFeature([ArticuloTienda, CarritoTienda, CategoriaTienda, PromocionTienda, ArticuloSucursal, Sucursal]),
     SucursalModule,
     ClienteModule,
     ConversacionModule,
