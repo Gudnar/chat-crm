@@ -122,6 +122,10 @@ __decorate([
     __metadata("design:type", Object)
 ], Agente.prototype, "recordatorioCitaPlantillaId", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: 'transcribir_audios', type: 'boolean', default: false }),
+    __metadata("design:type", Boolean)
+], Agente.prototype, "transcribirAudios", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: 'activo', type: 'boolean', default: true }),
     __metadata("design:type", Boolean)
 ], Agente.prototype, "activo", void 0);

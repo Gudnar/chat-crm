@@ -20,17 +20,21 @@ const typeorm_2 = require("typeorm");
 const reserva_entity_1 = require("../entity/reserva.entity");
 const servicio_agente_service_1 = require("./servicio-agente.service");
 const horario_agente_service_1 = require("./horario-agente.service");
+const excepcion_horario_agente_service_1 = require("./excepcion-horario-agente.service");
 const agente_service_1 = require("../../agente/service/agente.service");
 const base_service_1 = require("../../../common/base/base-service");
 const constants_1 = require("../../../common/constants");
 const fecha_bolivia_util_1 = require("../../../common/lib/fecha-bolivia.util");
+const google_calendar_sync_service_1 = require("../../google-calendar/service/google-calendar-sync.service");
 let ReservacionService = ReservacionService_1 = class ReservacionService extends base_service_1.BaseService {
-    constructor(reservaRepository, servicioAgenteService, horarioAgenteService, agenteService) {
+    constructor(reservaRepository, servicioAgenteService, horarioAgenteService, agenteService, excepcionHorarioAgenteService, googleCalendarSyncService) {
         super(ReservacionService_1.name);
         this.reservaRepository = reservaRepository;
         this.servicioAgenteService = servicioAgenteService;
         this.horarioAgenteService = horarioAgenteService;
         this.agenteService = agenteService;
+        this.excepcionHorarioAgenteService = excepcionHorarioAgenteService;
+        this.googleCalendarSyncService = googleCalendarSyncService;
     }
     async listar(clienteId, filtros) {
         const where = { clienteId, estado: constants_1.Status.ACTIVE };
@@ -88,7 +92,15 @@ let ReservacionService = ReservacionService_1 = class ReservacionService extends
             transaccion: constants_1.Transacccion.CREAR,
             usuarioCreacion,
         });
-        return this.reservaRepository.save(reserva);
+        const reservaGuardada = await this.reservaRepository.save(reserva);
+        if (reservaGuardada.tipoAgenteReserva === constants_1.TipoAgente.HUMANO) {
+            const googleEventId = await this.googleCalendarSyncService.sincronizarCreacion(reservaGuardada);
+            if (googleEventId) {
+                reservaGuardada.googleEventId = googleEventId;
+                await this.reservaRepository.save(reservaGuardada);
+            }
+        }
+        return reservaGuardada;
     }
     async actualizar(id, dto, usuarioModificacion, clienteId) {
         const reserva = await this.obtener(id, clienteId);
@@ -116,7 +128,11 @@ let ReservacionService = ReservacionService_1 = class ReservacionService extends
             transaccion: constants_1.Transacccion.ACTUALIZAR,
             usuarioModificacion,
         });
-        return this.reservaRepository.save(reserva);
+        const reservaActualizada = await this.reservaRepository.save(reserva);
+        if (reservaActualizada.tipoAgenteReserva === constants_1.TipoAgente.HUMANO) {
+            await this.googleCalendarSyncService.sincronizarActualizacion(reservaActualizada);
+        }
+        return reservaActualizada;
     }
     async actualizarEstado(id, dto, usuarioModificacion, clienteId) {
         const reserva = await this.obtener(id, clienteId);
@@ -127,7 +143,11 @@ let ReservacionService = ReservacionService_1 = class ReservacionService extends
             transaccion: constants_1.Transacccion.ACTUALIZAR,
             usuarioModificacion,
         });
-        return this.reservaRepository.save(reserva);
+        const reservaActualizada = await this.reservaRepository.save(reserva);
+        if (reservaActualizada.tipoAgenteReserva === constants_1.TipoAgente.HUMANO && dto.estado === constants_1.EstadoReserva.CANCELADA) {
+            await this.googleCalendarSyncService.sincronizarCancelacion(reservaActualizada);
+        }
+        return reservaActualizada;
     }
     async obtenerDisponibilidad(agenteId, clienteId, fecha, duracionMinutos) {
         const agente = await this.agenteService.obtener(agenteId, clienteId);
@@ -201,20 +221,13 @@ let ReservacionService = ReservacionService_1 = class ReservacionService extends
         const [h, m] = horaHHmm.split(':').map(Number);
         return new Date(Date.UTC(anio, mes - 1, dia, h + 4, m, 0, 0));
     }
-    aFechaYHoraLocal(fecha) {
-        const partes = new Intl.DateTimeFormat('en-CA', {
-            timeZone: 'America/La_Paz',
-            year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
-        }).formatToParts(fecha);
-        const valor = (tipo) => partes.find(p => p.type === tipo)?.value ?? '00';
-        return {
-            fecha: `${valor('year')}-${valor('month')}-${valor('day')}`,
-            hora: `${valor('hour')}:${valor('minute')}`,
-        };
-    }
     async validarDentroDeHorario(agenteId, clienteId, fechaInicio, fechaFin) {
-        const { fecha, hora: horaInicioStr } = this.aFechaYHoraLocal(fechaInicio);
+        const { fecha, hora: horaInicioStr } = (0, fecha_bolivia_util_1.utcAFechaHoraBolivia)(fechaInicio);
         const duracion = Math.round((fechaFin.getTime() - fechaInicio.getTime()) / 60000);
+        const { bloqueada, motivo } = await this.excepcionHorarioAgenteService.estaBloqueada(agenteId, clienteId, fecha);
+        if (bloqueada) {
+            throw new common_1.BadRequestException(`No se puede agendar el ${fecha}: ${motivo || 'fecha no disponible'}.`);
+        }
         const slots = await this.horarioAgenteService.generarSlotsBase(agenteId, clienteId, fecha, duracion);
         if (!slots.includes(horaInicioStr)) {
             throw new common_1.BadRequestException(`El agente no tiene horario de atención disponible el ${fecha} a las ${horaInicioStr} por ${duracion} minutos.`);
@@ -265,10 +278,13 @@ let ReservacionService = ReservacionService_1 = class ReservacionService extends
 ReservacionService = ReservacionService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(reserva_entity_1.Reserva)),
+    __param(5, (0, common_1.Inject)((0, common_1.forwardRef)(() => google_calendar_sync_service_1.GoogleCalendarSyncService))),
     __metadata("design:paramtypes", [typeorm_2.Repository,
         servicio_agente_service_1.ServicioAgenteService,
         horario_agente_service_1.HorarioAgenteService,
-        agente_service_1.AgenteService])
+        agente_service_1.AgenteService,
+        excepcion_horario_agente_service_1.ExcepcionHorarioAgenteService,
+        google_calendar_sync_service_1.GoogleCalendarSyncService])
 ], ReservacionService);
 exports.ReservacionService = ReservacionService;
 //# sourceMappingURL=reservacion.service.js.map

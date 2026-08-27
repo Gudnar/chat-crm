@@ -92,6 +92,7 @@ export const OrigenOportunidad = {
   INSTAGRAM: 'instagram',
   REFERENCIA: 'referencia',
   WEB: 'web',
+  META_ADS: 'meta_ads',
   OTRO: 'otro',
 }
 

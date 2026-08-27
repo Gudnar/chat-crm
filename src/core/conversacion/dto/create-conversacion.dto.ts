@@ -17,6 +17,21 @@ export class CreateConversacionDto {
   @IsString()
   canal?: string
 
+  @ApiProperty({ example: 'meta_ads', required: false, description: 'Origen del tráfico: meta_ads (automático) o un tag manual (ig_bio, website, etc.)' })
+  @IsOptional()
+  @IsString()
+  origenFuente?: string
+
+  @ApiProperty({ required: false, description: 'source_id del anuncio de Meta, solo cuando origenFuente es meta_ads' })
+  @IsOptional()
+  @IsString()
+  origenRefId?: string
+
+  @ApiProperty({ required: false, description: 'Datos crudos del origen (headline/body/ctwaClid del anuncio, etc.)' })
+  @IsOptional()
+  @IsObject()
+  origenDetalle?: Record<string, any>
+
   @ApiProperty({ required: false })
   @IsOptional()
   @IsArray()

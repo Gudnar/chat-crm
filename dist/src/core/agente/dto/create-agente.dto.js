@@ -122,6 +122,12 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateAgenteDto.prototype, "recordatorioCitaPlantillaId", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false, description: 'Transcribe las notas de voz del cliente antes de pasarlas al agente' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateAgenteDto.prototype, "transcribirAudios", void 0);
 exports.CreateAgenteDto = CreateAgenteDto;
 class UpdateAgenteDto extends CreateAgenteDto {
 }

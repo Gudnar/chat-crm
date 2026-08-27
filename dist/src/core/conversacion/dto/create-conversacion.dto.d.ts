@@ -2,6 +2,9 @@ export declare class CreateConversacionDto {
     agenteId: string;
     contacto: string;
     canal?: string;
+    origenFuente?: string;
+    origenRefId?: string;
+    origenDetalle?: Record<string, any>;
     etiquetas?: string[];
     notas?: string;
 }

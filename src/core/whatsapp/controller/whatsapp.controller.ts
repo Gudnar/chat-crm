@@ -12,6 +12,7 @@ import { ConfiguracionClienteService } from '../../cliente/service/configuracion
 import { PlantillaWhatsappService } from '../service/plantilla-whatsapp.service'
 import { WhatsappConfigDto, EnviarMensajeDto, EnviarAdjuntoDto, TestConexionDto, WaWebhookMessage, WaContact } from '../dto/whatsapp.dto'
 import { SuccessResponseDto } from '../../../common/dto/success-response.dto'
+import { baseUrlAssets } from '../../../common/lib/url-assets.util'
 
 const adjuntosStorage = diskStorage({
   destination: join(process.cwd(), 'uploads', 'conversaciones'),
@@ -187,10 +188,9 @@ export class WhatsappController {
   @UseInterceptors(FileInterceptor('file', { storage: adjuntosStorage, limits: { fileSize: 25 * 1024 * 1024 } }))
   async subirAdjunto(@UploadedFile() file: Express.Multer.File) {
     if (!file) throw new BadRequestException('No se recibió ningún archivo')
-    const appUrl = (process.env.APP_URL || 'http://localhost:3001').replace(/\/$/, '')
     const tipo = file.mimetype.startsWith('image/') ? 'image' : file.mimetype.startsWith('audio/') ? 'audio' : 'document'
     return new SuccessResponseDto({
-      url: `${appUrl}/uploads/conversaciones/${file.filename}`,
+      url: `${baseUrlAssets()}/uploads/conversaciones/${file.filename}`,
       tipo,
       nombre: file.originalname,
     })

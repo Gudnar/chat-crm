@@ -29,6 +29,7 @@ export declare class Agente extends AuditoriaEntity {
     recordatorioCitaHoras: number;
     recordatorioCitaMensaje?: string;
     recordatorioCitaPlantillaId?: string | null;
+    transcribirAudios: boolean;
     activo: boolean;
     avatar: string;
     color: string;

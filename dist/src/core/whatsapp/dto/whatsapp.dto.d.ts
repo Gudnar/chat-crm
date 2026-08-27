@@ -71,6 +71,15 @@ export interface WaWebhookMessage {
         name?: string;
         address?: string;
     };
+    referral?: {
+        source_id?: string;
+        source_url?: string;
+        source_type?: string;
+        headline?: string;
+        body?: string;
+        media_type?: string;
+        ctwa_clid?: string;
+    };
 }
 export interface WaContact {
     profile: {

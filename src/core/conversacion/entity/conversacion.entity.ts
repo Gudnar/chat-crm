@@ -28,6 +28,21 @@ export class Conversacion extends AuditoriaEntity {
   @Column({ name: 'canal', length: 30, default: 'chat' })
   canal: string
 
+  // Origen del tráfico que generó esta conversación — capturado una sola vez al
+  // crearla. 'meta_ads' viene automático del `referral` de un anuncio Click-to-
+  // WhatsApp; cualquier otro valor es un tag manual (ej. 'ig_bio') puesto en el
+  // texto prellenado de un link wa.me propio. Nunca se re-escribe si el contacto
+  // reabre una conversación existente.
+  @Column({ name: 'origen_fuente', type: 'varchar', length: 40, nullable: true })
+  origenFuente?: string | null
+
+  // source_id del anuncio de Meta — solo presente cuando origenFuente = 'meta_ads'.
+  @Column({ name: 'origen_ref_id', type: 'varchar', length: 100, nullable: true })
+  origenRefId?: string | null
+
+  @Column({ name: 'origen_detalle', type: 'jsonb', nullable: true })
+  origenDetalle?: Record<string, any> | null
+
   @Column({ name: 'estado_conversacion', length: 30, default: 'abierto' })
   estadoConversacion: string
 

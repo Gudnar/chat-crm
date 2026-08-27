@@ -50,6 +50,7 @@ const bootstrap = async () => {
       { path: 'whatsapp/webhook',  method: RequestMethod.POST },
       { path: 'red-social/webhook', method: RequestMethod.GET  },
       { path: 'red-social/webhook', method: RequestMethod.POST },
+      { path: 'google-calendar/oauth/callback', method: RequestMethod.GET },
     ],
   })
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }))

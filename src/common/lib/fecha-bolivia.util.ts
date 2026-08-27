@@ -17,3 +17,16 @@ export function fechaHoraBoliviaAUtc(fechaHoraStr: string): Date {
   const [h, m] = (hora || '00:00').split(':').map(Number)
   return new Date(Date.UTC(anio, mes - 1, dia, h + OFFSET_BOLIVIA_HORAS, m, 0, 0))
 }
+
+/** Formatea un instante UTC a "YYYY-MM-DD" y "HH:mm" en hora de Bolivia (America/La_Paz), sin depender del timezone del servidor. */
+export function utcAFechaHoraBolivia(fecha: Date): { fecha: string; hora: string } {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/La_Paz',
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).formatToParts(fecha)
+  const valor = (tipo: string) => partes.find(p => p.type === tipo)?.value ?? '00'
+  return {
+    fecha: `${valor('year')}-${valor('month')}-${valor('day')}`,
+    hora: `${valor('hour')}:${valor('minute')}`,
+  }
+}

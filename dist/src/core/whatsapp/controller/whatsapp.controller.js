@@ -27,6 +27,7 @@ const configuracion_cliente_service_1 = require("../../cliente/service/configura
 const plantilla_whatsapp_service_1 = require("../service/plantilla-whatsapp.service");
 const whatsapp_dto_1 = require("../dto/whatsapp.dto");
 const success_response_dto_1 = require("../../../common/dto/success-response.dto");
+const url_assets_util_1 = require("../../../common/lib/url-assets.util");
 const adjuntosStorage = (0, multer_1.diskStorage)({
     destination: (0, path_1.join)(process.cwd(), 'uploads', 'conversaciones'),
     filename: (_req, file, cb) => {
@@ -159,10 +160,9 @@ let WhatsappController = WhatsappController_1 = class WhatsappController {
     async subirAdjunto(file) {
         if (!file)
             throw new common_1.BadRequestException('No se recibió ningún archivo');
-        const appUrl = (process.env.APP_URL || 'http://localhost:3001').replace(/\/$/, '');
         const tipo = file.mimetype.startsWith('image/') ? 'image' : file.mimetype.startsWith('audio/') ? 'audio' : 'document';
         return new success_response_dto_1.SuccessResponseDto({
-            url: `${appUrl}/uploads/conversaciones/${file.filename}`,
+            url: `${(0, url_assets_util_1.baseUrlAssets)()}/uploads/conversaciones/${file.filename}`,
             tipo,
             nombre: file.originalname,
         });

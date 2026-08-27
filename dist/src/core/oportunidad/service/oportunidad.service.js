@@ -125,7 +125,10 @@ let OportunidadService = OportunidadService_1 = class OportunidadService extends
                     : null;
                 contactoNombre = nombreAsignado || contactoNombre || conv.contacto;
                 contactoTelefono = contactoTelefono || conv.contacto;
-                origen = origen || (conv.canal === 'chat' ? 'web' : conv.canal);
+                const origenValido = conv.origenFuente && Object.values(constants_1.OrigenOportunidad).includes(conv.origenFuente)
+                    ? conv.origenFuente
+                    : null;
+                origen = origen || origenValido || (conv.canal === 'chat' ? 'web' : conv.canal);
                 const primerMensaje = (conv.mensajes || []).find(m => m.role === 'user') || (conv.mensajes || [])[0];
                 fechaPrimerContacto = primerMensaje?.timestamp
                     ? new Date(primerMensaje.timestamp)

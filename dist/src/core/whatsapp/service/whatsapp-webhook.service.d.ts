@@ -1,4 +1,3 @@
-import { ConfigService } from '@nestjs/config';
 import { WhatsappService } from './whatsapp.service';
 import { ConversacionService } from '../../conversacion/service/conversacion.service';
 import { AgenteService } from '../../agente/service/agente.service';
@@ -6,6 +5,7 @@ import { ConfiguracionClienteService } from '../../cliente/service/configuracion
 import { HerramientaService } from '../../herramienta/service/herramienta.service';
 import { ToolExecutorService } from '../../herramienta/service/tool-executor.service';
 import { BaseConocimientoService } from '../../base-conocimiento/service/base-conocimiento.service';
+import { TranscripcionAudioService } from './transcripcion-audio.service';
 import { WaWebhookMessage } from '../dto/whatsapp.dto';
 export declare class WhatsappWebhookService {
     private readonly waService;
@@ -15,9 +15,9 @@ export declare class WhatsappWebhookService {
     private readonly herramientaService;
     private readonly toolExecutor;
     private readonly baseConocimientoService;
-    private readonly configService;
+    private readonly transcripcionService;
     private readonly logger;
-    constructor(waService: WhatsappService, conversacionService: ConversacionService, agenteService: AgenteService, confClienteService: ConfiguracionClienteService, herramientaService: HerramientaService, toolExecutor: ToolExecutorService, baseConocimientoService: BaseConocimientoService, configService: ConfigService);
+    constructor(waService: WhatsappService, conversacionService: ConversacionService, agenteService: AgenteService, confClienteService: ConfiguracionClienteService, herramientaService: HerramientaService, toolExecutor: ToolExecutorService, baseConocimientoService: BaseConocimientoService, transcripcionService: TranscripcionAudioService);
     procesarMensajeEntrante(rawMessage: WaWebhookMessage, contactName: string, phoneNumberId: string): Promise<void>;
     private extraerTexto;
     private extraerUbicacion;
@@ -26,6 +26,9 @@ export declare class WhatsappWebhookService {
     private descargarYGuardarAdjunto;
     private extensionDesdeMime;
     private encontrarOCrearConversacion;
+    private extraerOrigen;
     private llamarClaude;
     private sanitizarRespuesta;
+    private normalizarParaComparar;
+    private esTextoDuplicadoDe;
 }

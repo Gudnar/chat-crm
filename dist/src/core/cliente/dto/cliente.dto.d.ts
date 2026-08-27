@@ -16,6 +16,9 @@ export declare class CreateClienteDto {
             fin: string;
         }[];
     }[];
+    tiendaActiva?: boolean;
+    tiendaPortadaUrl?: string;
+    tiendaColorPrimario?: string;
 }
 export declare class UpdateClienteDto extends CreateClienteDto {
     activo?: boolean;

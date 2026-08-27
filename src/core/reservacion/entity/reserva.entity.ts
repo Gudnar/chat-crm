@@ -73,6 +73,10 @@ export class Reserva extends AuditoriaEntity {
   @Column({ name: 'recordatorio_enviado', type: 'boolean', default: false })
   recordatorioEnviado: boolean
 
+  /** Evento creado en el Google Calendar del agente (si tiene una cuenta conectada) — permite editarlo/borrarlo después. */
+  @Column({ name: 'google_event_id', type: 'varchar', length: 300, nullable: true })
+  googleEventId?: string | null
+
   constructor(data?: Partial<Reserva>) {
     super(data)
     if (data) Object.assign(this, data)

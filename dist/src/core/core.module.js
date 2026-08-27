@@ -24,10 +24,13 @@ const remarketing_module_1 = require("./remarketing/remarketing.module");
 const base_conocimiento_module_1 = require("./base-conocimiento/base-conocimiento.module");
 const producto_module_1 = require("./producto/producto.module");
 const soporte_module_1 = require("./soporte/soporte.module");
+const sucursal_module_1 = require("./sucursal/sucursal.module");
 const agente_humano_module_1 = require("./agente-humano/agente-humano.module");
 const oportunidad_module_1 = require("./oportunidad/oportunidad.module");
 const recurso_module_1 = require("./recurso/recurso.module");
 const reservacion_module_1 = require("./reservacion/reservacion.module");
+const tienda_module_1 = require("./tienda/tienda.module");
+const google_calendar_module_1 = require("./google-calendar/google-calendar.module");
 let CoreModule = class CoreModule {
 };
 CoreModule = __decorate([
@@ -63,10 +66,13 @@ CoreModule = __decorate([
             base_conocimiento_module_1.BaseConocimientoModule,
             producto_module_1.ProductoModule,
             soporte_module_1.SoporteModule,
+            sucursal_module_1.SucursalModule,
             agente_humano_module_1.AgenteHumanoModule,
             oportunidad_module_1.OportunidadModule,
             recurso_module_1.RecursoModule,
             reservacion_module_1.ReservacionModule,
+            tienda_module_1.TiendaModule,
+            google_calendar_module_1.GoogleCalendarModule,
         ],
     })
 ], CoreModule);

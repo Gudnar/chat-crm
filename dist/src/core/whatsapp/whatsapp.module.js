@@ -14,6 +14,7 @@ const plantilla_whatsapp_controller_1 = require("./controller/plantilla-whatsapp
 const flow_whatsapp_controller_1 = require("./controller/flow-whatsapp.controller");
 const whatsapp_service_1 = require("./service/whatsapp.service");
 const whatsapp_webhook_service_1 = require("./service/whatsapp-webhook.service");
+const transcripcion_audio_service_1 = require("./service/transcripcion-audio.service");
 const recordatorio_service_1 = require("./service/recordatorio.service");
 const recordatorio_cita_service_1 = require("./service/recordatorio-cita.service");
 const plantilla_whatsapp_service_1 = require("./service/plantilla-whatsapp.service");
@@ -30,6 +31,8 @@ const producto_module_1 = require("../producto/producto.module");
 const red_social_module_1 = require("../red-social/red-social.module");
 const recurso_module_1 = require("../recurso/recurso.module");
 const reservacion_module_1 = require("../reservacion/reservacion.module");
+const tienda_module_1 = require("../tienda/tienda.module");
+const sucursal_module_1 = require("../sucursal/sucursal.module");
 let WhatsappModule = class WhatsappModule {
 };
 WhatsappModule = __decorate([
@@ -44,10 +47,12 @@ WhatsappModule = __decorate([
             producto_module_1.ProductoModule,
             recurso_module_1.RecursoModule,
             reservacion_module_1.ReservacionModule,
+            sucursal_module_1.SucursalModule,
             (0, common_1.forwardRef)(() => red_social_module_1.RedSocialModule),
+            (0, common_1.forwardRef)(() => tienda_module_1.TiendaModule),
         ],
         controllers: [whatsapp_controller_1.WhatsappController, plantilla_whatsapp_controller_1.PlantillaWhatsappController, flow_whatsapp_controller_1.FlowWhatsappController],
-        providers: [whatsapp_service_1.WhatsappService, whatsapp_webhook_service_1.WhatsappWebhookService, tool_executor_service_1.ToolExecutorService, recordatorio_service_1.RecordatorioService, recordatorio_cita_service_1.RecordatorioCitaService, plantilla_whatsapp_service_1.PlantillaWhatsappService, flow_whatsapp_service_1.FlowWhatsappService],
+        providers: [whatsapp_service_1.WhatsappService, whatsapp_webhook_service_1.WhatsappWebhookService, transcripcion_audio_service_1.TranscripcionAudioService, tool_executor_service_1.ToolExecutorService, recordatorio_service_1.RecordatorioService, recordatorio_cita_service_1.RecordatorioCitaService, plantilla_whatsapp_service_1.PlantillaWhatsappService, flow_whatsapp_service_1.FlowWhatsappService],
         exports: [whatsapp_service_1.WhatsappService, plantilla_whatsapp_service_1.PlantillaWhatsappService, flow_whatsapp_service_1.FlowWhatsappService],
     })
 ], WhatsappModule);

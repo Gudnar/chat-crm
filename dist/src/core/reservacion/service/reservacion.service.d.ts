@@ -4,8 +4,10 @@ import { Reserva } from '../entity/reserva.entity';
 import { CreateReservaDto, UpdateReservaDto, ActualizarEstadoReservaDto } from '../dto/reserva.dto';
 import { ServicioAgenteService } from './servicio-agente.service';
 import { HorarioAgenteService } from './horario-agente.service';
+import { ExcepcionHorarioAgenteService } from './excepcion-horario-agente.service';
 import { AgenteService } from '../../agente/service/agente.service';
 import { BaseService } from '../../../common/base/base-service';
+import { GoogleCalendarSyncService } from '../../google-calendar/service/google-calendar-sync.service';
 export interface FiltrosReserva {
     agenteId?: string;
     estado?: string;
@@ -17,7 +19,9 @@ export declare class ReservacionService extends BaseService {
     private readonly servicioAgenteService;
     private readonly horarioAgenteService;
     private readonly agenteService;
-    constructor(reservaRepository: Repository<Reserva>, servicioAgenteService: ServicioAgenteService, horarioAgenteService: HorarioAgenteService, agenteService: AgenteService);
+    private readonly excepcionHorarioAgenteService;
+    private readonly googleCalendarSyncService;
+    constructor(reservaRepository: Repository<Reserva>, servicioAgenteService: ServicioAgenteService, horarioAgenteService: HorarioAgenteService, agenteService: AgenteService, excepcionHorarioAgenteService: ExcepcionHorarioAgenteService, googleCalendarSyncService: GoogleCalendarSyncService);
     listar(clienteId: string, filtros?: FiltrosReserva): Promise<Reserva[]>;
     obtener(id: string, clienteId: string): Promise<Reserva>;
     crear(dto: CreateReservaDto, usuarioCreacion: string, clienteId: string): Promise<Reserva>;
@@ -36,7 +40,6 @@ export declare class ReservacionService extends BaseService {
     private estaLibreEnHorario;
     obtenerDisponibilidadEquipo(clienteId: string, fecha: string, duracionMinutos: number): Promise<string[]>;
     private aFechaLocal;
-    private aFechaYHoraLocal;
     private validarDentroDeHorario;
     private validarSinSolapamiento;
     listarPendientesParaRecordatorioCita(agenteId: string, horasAntes: number): Promise<Reserva[]>;

@@ -33,6 +33,24 @@ __decorate([
     __metadata("design:type", String)
 ], CreateConversacionDto.prototype, "canal", void 0);
 __decorate([
+    (0, swagger_1.ApiProperty)({ example: 'meta_ads', required: false, description: 'Origen del tráfico: meta_ads (automático) o un tag manual (ig_bio, website, etc.)' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateConversacionDto.prototype, "origenFuente", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false, description: 'source_id del anuncio de Meta, solo cuando origenFuente es meta_ads' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateConversacionDto.prototype, "origenRefId", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false, description: 'Datos crudos del origen (headline/body/ctwaClid del anuncio, etc.)' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsObject)(),
+    __metadata("design:type", Object)
+], CreateConversacionDto.prototype, "origenDetalle", void 0);
+__decorate([
     (0, swagger_1.ApiProperty)({ required: false }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsArray)(),

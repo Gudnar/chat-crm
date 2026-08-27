@@ -15,10 +15,13 @@ import { RemarketingModule } from './remarketing/remarketing.module'
 import { BaseConocimientoModule } from './base-conocimiento/base-conocimiento.module'
 import { ProductoModule } from './producto/producto.module'
 import { SoporteModule } from './soporte/soporte.module'
+import { SucursalModule } from './sucursal/sucursal.module'
 import { AgenteHumanoModule } from './agente-humano/agente-humano.module'
 import { OportunidadModule } from './oportunidad/oportunidad.module'
 import { RecursoModule } from './recurso/recurso.module'
 import { ReservacionModule } from './reservacion/reservacion.module'
+import { TiendaModule } from './tienda/tienda.module'
+import { GoogleCalendarModule } from './google-calendar/google-calendar.module'
 
 @Module({
   imports: [
@@ -52,10 +55,13 @@ import { ReservacionModule } from './reservacion/reservacion.module'
     BaseConocimientoModule,
     ProductoModule,
     SoporteModule,
+    SucursalModule,
     AgenteHumanoModule,
     OportunidadModule,
     RecursoModule,
     ReservacionModule,
+    TiendaModule,
+    GoogleCalendarModule,
   ],
 })
 export class CoreModule {}

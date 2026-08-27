@@ -86,6 +86,24 @@ __decorate([
     (0, class_validator_1.IsArray)(),
     __metadata("design:type", Array)
 ], CreateClienteDto.prototype, "horarios", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false, description: 'Activa la tienda online pública en /tienda/:slug' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsBoolean)(),
+    __metadata("design:type", Boolean)
+], CreateClienteDto.prototype, "tiendaActiva", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateClienteDto.prototype, "tiendaPortadaUrl", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ required: false, example: '#2563eb', description: 'Color primario de la tienda online (hex)' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], CreateClienteDto.prototype, "tiendaColorPrimario", void 0);
 exports.CreateClienteDto = CreateClienteDto;
 class UpdateClienteDto extends CreateClienteDto {
 }

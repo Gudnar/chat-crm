@@ -156,5 +156,55 @@ exports.HERRAMIENTAS_DEFAULT = [
         activa: true, autoConfirmar: true, confianzaMinima: 60, color: '#ec4899', icono: 'file-text',
         ejemplo: 'iniciar_flow({ nombre_flow: "reserva_spa", mensaje: "Completá este formulario para tu reserva:" })',
     },
+    {
+        nombre: 'abrir_tienda',
+        label: 'Abrir Tienda Online',
+        descripcion: 'Manda al cliente el link de la tienda online del negocio, donde puede armar su pedido completo (con variantes/extras si aplica) sin tener que escribir todo por chat. El carrito queda atado a esta conversación, así que cuando el cliente confirme su pedido en la web, el resumen llega solo de vuelta acá. Solo funciona si el cliente activó su tienda online — si no está activa, no se manda nada.',
+        parametros: [
+            { nombre: 'mensaje', tipo: 'string', descripcion: 'Texto que acompaña al botón que abre la tienda (opcional, tiene un valor por defecto)', requerido: false },
+        ],
+        activa: true, autoConfirmar: true, confianzaMinima: 60, color: '#f97316', icono: 'shopping-cart',
+        ejemplo: 'abrir_tienda({ mensaje: "Armá tu pedido directo acá 🛍️" })',
+    },
+    {
+        nombre: 'crear_pedido',
+        label: 'Crear Pedido',
+        descripcion: 'Crea un pedido nuevo en la sucursal especificada con los items que el cliente solicitó. Úsala cuando el cliente ya decidió qué quiere comprar y está listo para confirmar. El sistema genera automáticamente un código de pedido y lo devuelve.',
+        parametros: [
+            { nombre: 'items', tipo: 'array', requerido: true, descripcion: 'Lista de productos a comprar con cantidad',
+                itemsPropiedades: [
+                    { nombre: 'nombre', tipo: 'string', descripcion: 'Nombre del producto', requerido: true },
+                    { nombre: 'cantidad', tipo: 'integer', descripcion: 'Cantidad a comprar', requerido: true, minimo: 1 },
+                    { nombre: 'precioUnitario', tipo: 'number', descripcion: 'Precio unitario del producto', requerido: true },
+                ],
+            },
+            { nombre: 'tipoEntrega', tipo: 'enum', requerido: false, descripcion: 'Tipo de entrega (recojo o delivery)', opciones: ['recojo', 'delivery'] },
+            { nombre: 'direccion', tipo: 'string', requerido: false, descripcion: 'Dirección de entrega si es delivery' },
+            { nombre: 'notas', tipo: 'string', requerido: false, descripcion: 'Notas adicionales del pedido' },
+        ],
+        activa: true, autoConfirmar: true, confianzaMinima: 70, color: '#10b981', icono: 'check-circle',
+        ejemplo: 'crear_pedido({ items: [{nombre:"Producto A", cantidad:2, precioUnitario:100}], tipoEntrega:"delivery", direccion:"Calle Principal 123" })',
+    },
+    {
+        nombre: 'consultar_stock_sucursal',
+        label: 'Consultar Stock por Sucursal',
+        descripcion: 'Consulta la disponibilidad de un producto en una sucursal específica. Úsala cuando el cliente pregunte por stock o disponibilidad en una ubicación en particular.',
+        parametros: [
+            { nombre: 'nombreProducto', tipo: 'string', descripcion: 'Nombre del producto a consultar', requerido: true },
+            { nombre: 'sucursal', tipo: 'string', descripcion: 'Nombre o código de la sucursal', requerido: true },
+        ],
+        activa: true, autoConfirmar: true, confianzaMinima: 60, color: '#0ea5e9', icono: 'inventory',
+        ejemplo: 'consultar_stock_sucursal({ nombreProducto: "Zapatillas Nike", sucursal: "La Paz" })',
+    },
+    {
+        nombre: 'consultar_estado_pedido',
+        label: 'Consultar Estado del Pedido',
+        descripcion: 'Consulta el estado actual de un pedido que ya fue creado. Útil para saber si está en preparación, listo o entregado.',
+        parametros: [
+            { nombre: 'codigoPedido', tipo: 'string', descripcion: 'Código del pedido (ej. LPZ-00001)', requerido: true },
+        ],
+        activa: true, autoConfirmar: true, confianzaMinima: 60, color: '#8b5cf6', icono: 'clock',
+        ejemplo: 'consultar_estado_pedido({ codigoPedido: "LPZ-00001" })',
+    },
 ];
 //# sourceMappingURL=herramienta.defaults.js.map

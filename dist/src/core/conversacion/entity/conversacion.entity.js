@@ -50,6 +50,18 @@ __decorate([
     __metadata("design:type", String)
 ], Conversacion.prototype, "canal", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: 'origen_fuente', type: 'varchar', length: 40, nullable: true }),
+    __metadata("design:type", Object)
+], Conversacion.prototype, "origenFuente", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'origen_ref_id', type: 'varchar', length: 100, nullable: true }),
+    __metadata("design:type", Object)
+], Conversacion.prototype, "origenRefId", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'origen_detalle', type: 'jsonb', nullable: true }),
+    __metadata("design:type", Object)
+], Conversacion.prototype, "origenDetalle", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: 'estado_conversacion', length: 30, default: 'abierto' }),
     __metadata("design:type", String)
 ], Conversacion.prototype, "estadoConversacion", void 0);

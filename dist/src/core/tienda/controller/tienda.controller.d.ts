@@ -1,0 +1,41 @@
+/// <reference types="multer" />
+import { TiendaService } from '../service/tienda.service';
+import { PromocionTiendaService } from '../service/promocion-tienda.service';
+import { CreateArticuloTiendaDto, UpdateArticuloTiendaDto } from '../dto/articulo-tienda.dto';
+import { CreateCategoriaTiendaDto, UpdateCategoriaTiendaDto } from '../dto/categoria-tienda.dto';
+import { CreatePromocionTiendaDto, UpdatePromocionTiendaDto } from '../dto/promocion-tienda.dto';
+import { DisponibilidadSucursalDto } from '../dto/disponibilidad-tienda.dto';
+import { ClienteService } from '../../cliente/service/cliente.service';
+import { SucursalService } from '../../sucursal/service/sucursal.service';
+import { CreateSucursalDto, UpdateSucursalDto } from '../../sucursal/dto/create-sucursal.dto';
+import { SuccessResponseDto } from '../../../common/dto/success-response.dto';
+export declare class TiendaController {
+    private readonly tiendaService;
+    private readonly promocionService;
+    private readonly sucursalService;
+    private readonly clienteService;
+    constructor(tiendaService: TiendaService, promocionService: PromocionTiendaService, sucursalService: SucursalService, clienteService: ClienteService);
+    listarSucursales(req: any): Promise<SuccessResponseDto>;
+    crearSucursal(dto: CreateSucursalDto, req: any): Promise<SuccessResponseDto>;
+    actualizarSucursal(id: string, dto: UpdateSucursalDto, req: any): Promise<SuccessResponseDto>;
+    eliminarSucursal(id: string, req: any): Promise<SuccessResponseDto>;
+    subirQrSucursal(id: string, file: Express.Multer.File, req: any): Promise<SuccessResponseDto>;
+    listarCategorias(req: any): Promise<SuccessResponseDto>;
+    crearCategoria(dto: CreateCategoriaTiendaDto, req: any): Promise<SuccessResponseDto>;
+    actualizarCategoria(id: string, dto: UpdateCategoriaTiendaDto, req: any): Promise<SuccessResponseDto>;
+    eliminarCategoria(id: string, req: any): Promise<SuccessResponseDto>;
+    subirImagenCategoria(id: string, file: Express.Multer.File, req: any): Promise<SuccessResponseDto>;
+    listarPromociones(req: any): Promise<SuccessResponseDto>;
+    crearPromocion(dto: CreatePromocionTiendaDto, req: any): Promise<SuccessResponseDto>;
+    actualizarPromocion(id: string, dto: UpdatePromocionTiendaDto, req: any): Promise<SuccessResponseDto>;
+    eliminarPromocion(id: string, req: any): Promise<SuccessResponseDto>;
+    subirPortada(clienteId: string, file: Express.Multer.File, req: any): Promise<SuccessResponseDto>;
+    listar(req: any): Promise<SuccessResponseDto>;
+    obtener(id: string, req: any): Promise<SuccessResponseDto>;
+    crear(dto: CreateArticuloTiendaDto, req: any): Promise<SuccessResponseDto>;
+    actualizar(id: string, dto: UpdateArticuloTiendaDto, req: any): Promise<SuccessResponseDto>;
+    eliminar(id: string, req: any): Promise<SuccessResponseDto>;
+    subirImagen(id: string, file: Express.Multer.File, req: any): Promise<SuccessResponseDto>;
+    listarDisponibilidad(id: string, req: any): Promise<SuccessResponseDto>;
+    actualizarDisponibilidad(id: string, filas: DisponibilidadSucursalDto[], req: any): Promise<SuccessResponseDto>;
+}

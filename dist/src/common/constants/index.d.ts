@@ -75,6 +75,7 @@ export declare const OrigenOportunidad: {
     INSTAGRAM: string;
     REFERENCIA: string;
     WEB: string;
+    META_ADS: string;
     OTRO: string;
 };
 export declare const EstadoReserva: {

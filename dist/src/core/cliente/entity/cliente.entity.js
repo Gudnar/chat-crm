@@ -77,6 +77,18 @@ __decorate([
     __metadata("design:type", Object)
 ], Cliente.prototype, "metadatos", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: 'tienda_activa', type: 'boolean', default: false }),
+    __metadata("design:type", Boolean)
+], Cliente.prototype, "tiendaActiva", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'tienda_portada_url', length: 500, nullable: true }),
+    __metadata("design:type", String)
+], Cliente.prototype, "tiendaPortadaUrl", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'tienda_color_primario', length: 20, default: '#2563eb' }),
+    __metadata("design:type", String)
+], Cliente.prototype, "tiendaColorPrimario", void 0);
+__decorate([
     (0, typeorm_1.OneToMany)(() => configuracion_cliente_entity_1.ConfiguracionCliente, c => c.cliente),
     __metadata("design:type", Array)
 ], Cliente.prototype, "configuraciones", void 0);

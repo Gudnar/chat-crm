@@ -45,6 +45,17 @@ export interface WaWebhookMessage {
   audio?: { id: string; mime_type: string }
   document?: { id: string; filename: string; mime_type: string; caption?: string }
   location?: { latitude: number; longitude: number; name?: string; address?: string }
+  // Presente solo en el PRIMER mensaje cuando el cliente llega desde un anuncio
+  // Click-to-WhatsApp de Meta — lo agrega Meta automáticamente, no hay que pedirlo.
+  referral?: {
+    source_id?: string
+    source_url?: string
+    source_type?: string
+    headline?: string
+    body?: string
+    media_type?: string
+    ctwa_clid?: string
+  }
 }
 
 export interface WaContact {

@@ -36,12 +36,13 @@ let ConfiguracionClienteService = ConfiguracionClienteService_1 = class Configur
         return this.repo.findOne({ where: { clienteId, clave, estado: constants_1.Status.ACTIVE } });
     }
     async set(clienteId, dto, usuarioCreacion) {
-        const existe = await this.obtenerPorClave(clienteId, dto.clave);
+        const existe = await this.repo.findOne({ where: { clienteId, clave: dto.clave } });
         if (existe) {
             Object.assign(existe, {
                 valor: dto.valor,
                 descripcion: dto.descripcion ?? existe.descripcion,
                 esSecreto: dto.esSecreto ?? existe.esSecreto,
+                estado: constants_1.Status.ACTIVE,
                 transaccion: constants_1.Transacccion.ACTUALIZAR,
                 usuarioModificacion: usuarioCreacion,
             });

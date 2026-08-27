@@ -20,5 +20,6 @@ export declare class Reserva extends AuditoriaEntity {
     notasInternas?: string;
     resultado?: string;
     recordatorioEnviado: boolean;
+    googleEventId?: string | null;
     constructor(data?: Partial<Reserva>);
 }

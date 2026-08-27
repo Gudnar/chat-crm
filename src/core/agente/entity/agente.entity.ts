@@ -92,6 +92,10 @@ export class Agente extends AuditoriaEntity {
   @Column({ name: 'recordatorio_cita_plantilla_id', type: 'bigint', nullable: true })
   recordatorioCitaPlantillaId?: string | null
 
+  /** Transcribe las notas de voz que manda el cliente (vía OpenAI Whisper) antes de pasarlas a Claude, que no acepta audio como input. */
+  @Column({ name: 'transcribir_audios', type: 'boolean', default: false })
+  transcribirAudios: boolean
+
   @Column({ name: 'activo', type: 'boolean', default: true })
   activo: boolean
 

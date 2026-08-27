@@ -8,6 +8,9 @@ export declare class Conversacion extends AuditoriaEntity {
     fechaAsignacionHumano?: Date | null;
     contacto: string;
     canal: string;
+    origenFuente?: string | null;
+    origenRefId?: string | null;
+    origenDetalle?: Record<string, any> | null;
     estadoConversacion: string;
     score: number;
     mensajes: Array<{

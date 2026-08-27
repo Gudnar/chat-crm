@@ -13,6 +13,7 @@ import { BaseService } from '../../../common/base/base-service'
 import {
   ESTADOS_OPORTUNIDAD_FINALES,
   EstadoOportunidad,
+  OrigenOportunidad,
   Roles,
   Status,
   Transacccion,
@@ -171,7 +172,14 @@ export class OportunidadService extends BaseService {
           : null
         contactoNombre = nombreAsignado || contactoNombre || conv.contacto
         contactoTelefono = contactoTelefono || conv.contacto
-        origen = origen || (conv.canal === 'chat' ? 'web' : conv.canal)
+        // Preferir el origen real capturado del tráfico (ej. 'meta_ads' de un anuncio
+        // Click-to-WhatsApp) sobre el canal genérico. Tags manuales (ig_bio, etc.) que
+        // no están en el enum se descartan acá y caen al fallback de canal — @IsIn en
+        // el DTO rechazaría un valor fuera del enum.
+        const origenValido = conv.origenFuente && Object.values(OrigenOportunidad).includes(conv.origenFuente as any)
+          ? conv.origenFuente
+          : null
+        origen = origen || origenValido || (conv.canal === 'chat' ? 'web' : conv.canal)
         // Fecha y hora del primer mensaje del contacto
         const primerMensaje = (conv.mensajes || []).find(m => m.role === 'user') || (conv.mensajes || [])[0]
         fechaPrimerContacto = primerMensaje?.timestamp

@@ -3,19 +3,18 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { existsSync, unlinkSync } from 'fs'
 import { join } from 'path'
-import { ConfigService } from '@nestjs/config'
 import * as ExcelJS from 'exceljs'
 import { Producto } from '../entity/producto.entity'
 import { CreateProductoDto, UpdateProductoDto } from '../dto/create-producto.dto'
 import { BaseService } from '../../../common/base/base-service'
 import { Status, Transacccion } from '../../../common/constants'
+import { baseUrlAssets } from '../../../common/lib/url-assets.util'
 
 @Injectable()
 export class ProductoService extends BaseService {
   constructor(
     @InjectRepository(Producto)
     private readonly repo: Repository<Producto>,
-    private readonly configService: ConfigService,
   ) {
     super(ProductoService.name)
   }
@@ -23,8 +22,7 @@ export class ProductoService extends BaseService {
   // ── URL helpers ───────────────────────────────────────────────
 
   construirUrlImagen(filename: string): string {
-    const appUrl = (this.configService.get<string>('APP_URL') || 'http://localhost:3001').replace(/\/$/, '')
-    return `${appUrl}/uploads/${filename}`
+    return `${baseUrlAssets()}/uploads/${filename}`
   }
 
   resolverUrlsImagenes(filenames: string[]): string[] {

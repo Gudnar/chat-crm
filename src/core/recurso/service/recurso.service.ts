@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
-import { ConfigService } from '@nestjs/config'
 import { existsSync, unlinkSync } from 'fs'
 import { join } from 'path'
 import { Recurso, TipoRecurso } from '../entity/recurso.entity'
@@ -9,13 +8,13 @@ import { CreateRecursoDto, UpdateRecursoDto } from '../dto/create-recurso.dto'
 import { BaseService } from '../../../common/base/base-service'
 import { Status, Transacccion } from '../../../common/constants'
 import { detectarTipo, LIMITE_BYTES_POR_TIPO, MIME_POR_TIPO, formatearBytes } from '../recurso.constants'
+import { baseUrlAssets } from '../../../common/lib/url-assets.util'
 
 @Injectable()
 export class RecursoService extends BaseService {
   constructor(
     @InjectRepository(Recurso)
     private readonly recursoRepository: Repository<Recurso>,
-    private readonly configService: ConfigService,
   ) {
     super(RecursoService.name)
   }
@@ -173,8 +172,7 @@ export class RecursoService extends BaseService {
     }
 
     if (recurso.archivoLocal) {
-      const appUrl = (this.configService.get<string>('APP_URL') || 'http://localhost:3001').replace(/\/$/, '')
-      return `${appUrl}/uploads/recursos/${clienteId}/${recurso.archivoLocal}`
+      return `${baseUrlAssets()}/uploads/recursos/${clienteId}/${recurso.archivoLocal}`
     }
 
     throw new BadRequestException('Recurso no tiene URL')

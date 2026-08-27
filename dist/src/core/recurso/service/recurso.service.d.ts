@@ -1,13 +1,11 @@
 /// <reference types="multer" />
 import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
 import { Recurso, TipoRecurso } from '../entity/recurso.entity';
 import { CreateRecursoDto, UpdateRecursoDto } from '../dto/create-recurso.dto';
 import { BaseService } from '../../../common/base/base-service';
 export declare class RecursoService extends BaseService {
     private readonly recursoRepository;
-    private readonly configService;
-    constructor(recursoRepository: Repository<Recurso>, configService: ConfigService);
+    constructor(recursoRepository: Repository<Recurso>);
     listar(clienteId: string, filtros?: {
         tipo?: TipoRecurso;
         categoria?: string;

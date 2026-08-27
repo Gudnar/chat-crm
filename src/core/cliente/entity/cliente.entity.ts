@@ -46,6 +46,16 @@ export class Cliente extends AuditoriaEntity {
   @Column({ name: 'metadatos', type: 'jsonb', nullable: true })
   metadatos?: Record<string, any>
 
+  /** Tienda online pública en /tienda/:slug — apagada por defecto hasta que el cliente la active. */
+  @Column({ name: 'tienda_activa', type: 'boolean', default: false })
+  tiendaActiva: boolean
+
+  @Column({ name: 'tienda_portada_url', length: 500, nullable: true })
+  tiendaPortadaUrl?: string
+
+  @Column({ name: 'tienda_color_primario', length: 20, default: '#2563eb' })
+  tiendaColorPrimario: string
+
   @OneToMany(() => ConfiguracionCliente, c => c.cliente)
   configuraciones: ConfiguracionCliente[]
 

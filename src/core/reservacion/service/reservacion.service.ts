@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common'
+import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, forwardRef } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Not, Repository } from 'typeorm'
 import { Agente } from '../../agente/entity/agente.entity'
@@ -6,10 +6,12 @@ import { Reserva } from '../entity/reserva.entity'
 import { CreateReservaDto, UpdateReservaDto, ActualizarEstadoReservaDto } from '../dto/reserva.dto'
 import { ServicioAgenteService } from './servicio-agente.service'
 import { HorarioAgenteService } from './horario-agente.service'
+import { ExcepcionHorarioAgenteService } from './excepcion-horario-agente.service'
 import { AgenteService } from '../../agente/service/agente.service'
 import { BaseService } from '../../../common/base/base-service'
 import { Status, Transacccion, TipoAgente, EstadoReserva } from '../../../common/constants'
-import { fechaHoraBoliviaAUtc } from '../../../common/lib/fecha-bolivia.util'
+import { fechaHoraBoliviaAUtc, utcAFechaHoraBolivia } from '../../../common/lib/fecha-bolivia.util'
+import { GoogleCalendarSyncService } from '../../google-calendar/service/google-calendar-sync.service'
 
 export interface FiltrosReserva {
   agenteId?: string
@@ -26,6 +28,9 @@ export class ReservacionService extends BaseService {
     private readonly servicioAgenteService: ServicioAgenteService,
     private readonly horarioAgenteService: HorarioAgenteService,
     private readonly agenteService: AgenteService,
+    private readonly excepcionHorarioAgenteService: ExcepcionHorarioAgenteService,
+    @Inject(forwardRef(() => GoogleCalendarSyncService))
+    private readonly googleCalendarSyncService: GoogleCalendarSyncService,
   ) {
     super(ReservacionService.name)
   }
@@ -92,7 +97,17 @@ export class ReservacionService extends BaseService {
       usuarioCreacion,
     })
 
-    return this.reservaRepository.save(reserva)
+    const reservaGuardada = await this.reservaRepository.save(reserva)
+
+    if (reservaGuardada.tipoAgenteReserva === TipoAgente.HUMANO) {
+      const googleEventId = await this.googleCalendarSyncService.sincronizarCreacion(reservaGuardada)
+      if (googleEventId) {
+        reservaGuardada.googleEventId = googleEventId
+        await this.reservaRepository.save(reservaGuardada)
+      }
+    }
+
+    return reservaGuardada
   }
 
   async actualizar(id: string, dto: UpdateReservaDto, usuarioModificacion: string, clienteId: string): Promise<Reserva> {
@@ -123,7 +138,11 @@ export class ReservacionService extends BaseService {
       transaccion: Transacccion.ACTUALIZAR,
       usuarioModificacion,
     })
-    return this.reservaRepository.save(reserva)
+    const reservaActualizada = await this.reservaRepository.save(reserva)
+    if (reservaActualizada.tipoAgenteReserva === TipoAgente.HUMANO) {
+      await this.googleCalendarSyncService.sincronizarActualizacion(reservaActualizada)
+    }
+    return reservaActualizada
   }
 
   async actualizarEstado(
@@ -140,7 +159,11 @@ export class ReservacionService extends BaseService {
       transaccion: Transacccion.ACTUALIZAR,
       usuarioModificacion,
     })
-    return this.reservaRepository.save(reserva)
+    const reservaActualizada = await this.reservaRepository.save(reserva)
+    if (reservaActualizada.tipoAgenteReserva === TipoAgente.HUMANO && dto.estado === EstadoReserva.CANCELADA) {
+      await this.googleCalendarSyncService.sincronizarCancelacion(reservaActualizada)
+    }
+    return reservaActualizada
   }
 
   /** Slots "HH:mm" disponibles para agendar, descontando reservas ya confirmadas (solo agentes humanos). */
@@ -244,22 +267,14 @@ export class ReservacionService extends BaseService {
     return new Date(Date.UTC(anio, mes - 1, dia, h + 4, m, 0, 0))
   }
 
-  /** Formatea un Date a "YYYY-MM-DD" y "HH:mm" en hora de Bolivia (America/La_Paz), sin depender del timezone del servidor. */
-  private aFechaYHoraLocal(fecha: Date): { fecha: string; hora: string } {
-    const partes = new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'America/La_Paz',
-      year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false,
-    }).formatToParts(fecha)
-    const valor = (tipo: string) => partes.find(p => p.type === tipo)?.value ?? '00'
-    return {
-      fecha: `${valor('year')}-${valor('month')}-${valor('day')}`,
-      hora: `${valor('hour')}:${valor('minute')}`,
-    }
-  }
-
   private async validarDentroDeHorario(agenteId: string, clienteId: string, fechaInicio: Date, fechaFin: Date): Promise<void> {
-    const { fecha, hora: horaInicioStr } = this.aFechaYHoraLocal(fechaInicio)
+    const { fecha, hora: horaInicioStr } = utcAFechaHoraBolivia(fechaInicio)
     const duracion = Math.round((fechaFin.getTime() - fechaInicio.getTime()) / 60000)
+
+    const { bloqueada, motivo } = await this.excepcionHorarioAgenteService.estaBloqueada(agenteId, clienteId, fecha)
+    if (bloqueada) {
+      throw new BadRequestException(`No se puede agendar el ${fecha}: ${motivo || 'fecha no disponible'}.`)
+    }
 
     const slots = await this.horarioAgenteService.generarSlotsBase(agenteId, clienteId, fecha, duracion)
     if (!slots.includes(horaInicioStr)) {

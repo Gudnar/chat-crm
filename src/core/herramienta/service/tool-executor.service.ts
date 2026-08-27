@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common'
+import { ConfigService } from '@nestjs/config'
 import { extname } from 'path'
 import { ConversacionService } from '../../conversacion/service/conversacion.service'
 import { ProductoService } from '../../producto/service/producto.service'
@@ -7,6 +8,11 @@ import { RecursoService } from '../../recurso/service/recurso.service'
 import { Recurso, TipoRecurso } from '../../recurso/entity/recurso.entity'
 import { ReservacionService } from '../../reservacion/service/reservacion.service'
 import { FlowWhatsappService } from '../../whatsapp/service/flow-whatsapp.service'
+import { TiendaPublicaService } from '../../tienda/service/tienda-publica.service'
+import { PedidoService } from '../../sucursal/service/pedido.service'
+import { InventarioSucursalService } from '../../sucursal/service/inventario-sucursal.service'
+import { SucursalService } from '../../sucursal/service/sucursal.service'
+import { ClienteFinalService } from '../../sucursal/service/cliente-final.service'
 import { EstadoFlowWhatsapp, USUARIO_SISTEMA } from '../../../common/constants'
 import { fechaHoraBoliviaAUtc } from '../../../common/lib/fecha-bolivia.util'
 
@@ -67,6 +73,15 @@ export class ToolExecutorService {
     private readonly recursoService: RecursoService,
     private readonly reservacionService: ReservacionService,
     private readonly flowWhatsappService: FlowWhatsappService,
+    // forwardRef: TiendaModule importa WhatsappModule (que provee este servicio) para
+    // avisar pedidos por WhatsApp, así que el ciclo se resuelve con forwardRef acá también.
+    @Inject(forwardRef(() => TiendaPublicaService))
+    private readonly tiendaPublicaService: TiendaPublicaService,
+    private readonly pedidoService: PedidoService,
+    private readonly inventarioService: InventarioSucursalService,
+    private readonly sucursalService: SucursalService,
+    private readonly clienteFinalService: ClienteFinalService,
+    private readonly configService: ConfigService,
   ) {}
 
   async ejecutar(nombre: string, input: Record<string, any>, contexto: ToolContexto): Promise<ToolResult> {
@@ -88,6 +103,10 @@ export class ToolExecutorService {
         case 'solicitar_ubicacion': return await this.solicitarUbicacion(input, contexto)
         case 'iniciar_flow':        return await this.iniciarFlow(input, contexto)
         case 'reservar_producto':   return await this.reservarProducto(input, contexto)
+        case 'abrir_tienda':        return await this.abrirTienda(input, contexto)
+        case 'crear_pedido':        return await this.crearPedido(input, contexto)
+        case 'consultar_stock_sucursal': return await this.consultarStockSucursal(input, contexto)
+        case 'consultar_estado_pedido': return await this.consultarEstadoPedido(input, contexto)
         default:
           this.logger.warn(`[Tool] Herramienta desconocida: ${nombre}`)
           return { texto: `Herramienta "${nombre}" no está implementada.` }
@@ -187,6 +206,30 @@ export class ToolExecutorService {
         cta: flow.cta,
         screenId: this.flowWhatsappService.obtenerScreenId(),
       },
+    }
+  }
+
+  /** Abre la tienda online del cliente con un carrito ya atado a esta conversación, para poder avisar el pedido por WhatsApp cuando confirme. */
+  private async abrirTienda(input: any, ctx: ToolContexto): Promise<ToolResult> {
+    const mensaje = String(input?.mensaje || '').trim() || 'Podés armar tu pedido directo desde acá 🛍️'
+
+    const conversacion = await this.conversacionService.obtener(ctx.conversacionId).catch(() => null)
+    const contactoTelefono = conversacion?.contacto
+    if (!contactoTelefono) {
+      return { texto: '[Sistema: no se pudo resolver el contacto de esta conversación. No se abrió la tienda.]' }
+    }
+
+    const resultado = await this.tiendaPublicaService.abrirParaConversacion(ctx.clienteId, ctx.conversacionId, contactoTelefono)
+    if (!resultado.ok) {
+      return { texto: `[Sistema: ${resultado.error} No se envió nada — seguí atendiendo al cliente por texto normal.]` }
+    }
+
+    const frontendUrl = (this.configService.get<string>('FRONTEND_URL') || 'http://localhost:8083').replace(/\/$/, '')
+    const url = `${frontendUrl}/tienda/${resultado.slug}?s=${resultado.token}`
+
+    return {
+      texto: `[Sistema: se le mandó al cliente el link de la tienda online. Espera a que arme y confirme su pedido — no inventes ni asumas qué eligió.]`,
+      botonLink: { mensaje, textoBoton: 'Ver catálogo 🛍️', url },
     }
   }
 
@@ -439,6 +482,145 @@ export class ToolExecutorService {
     } catch (err: any) {
       this.logger.error(`[enviarRecurso] ERROR: ${err.message}`, err.stack)
       return { texto: `[Sistema: error interno al buscar recurso: ${err.message}]` }
+    }
+  }
+
+  private async crearPedido(input: any, ctx: ToolContexto): Promise<ToolResult> {
+    try {
+      const items = Array.isArray(input?.items) ? input.items : []
+      const tipoEntrega = input?.tipoEntrega || 'recojo'
+      const direccion = input?.direccion
+      const notas = input?.notas
+
+      if (!items.length) {
+        return { texto: '[Sistema: crear_pedido necesita al menos 1 item. No se creó pedido.]' }
+      }
+
+      // Obtener información de la conversación para saber la sucursal
+      const conv = await this.conversacionService.obtener(ctx.conversacionId)
+      const sucursales = await this.sucursalService.listar(ctx.clienteId, true)
+
+      if (!sucursales.length) {
+        return { texto: '[Sistema: no hay sucursales activas para crear el pedido.]' }
+      }
+
+      // Usar la primera sucursal (en una versión real, permitir elegir)
+      const sucursal = sucursales[0]
+
+      // Calcular totales
+      let totalGeneral = 0
+      const itemsFormato = items.map((item: any) => {
+        const cantidad = Number(item.cantidad) || 1
+        const precioUnitario = Number(item.precioUnitario) || 0
+        const itemSubtotal = cantidad * precioUnitario
+        totalGeneral += itemSubtotal
+        return {
+          productoId: `${item.nombre}`.toLowerCase(),
+          nombre: item.nombre,
+          cantidad,
+          precioUnitario,
+          subtotal: itemSubtotal,
+        }
+      })
+
+      const total = totalGeneral
+
+      // Buscar o crear cliente final
+      let clienteFinal = await this.clienteFinalService.buscarPorTelefono(ctx.clienteId, conv.contacto)
+      if (!clienteFinal) {
+        clienteFinal = await this.clienteFinalService.crear(ctx.clienteId, {
+          nombre: conv.contacto,
+          telefono: conv.contacto,
+          sucursalId: sucursal.id,
+        }, USUARIO_SISTEMA)
+      }
+
+      // Crear el pedido
+      const pedido = await this.pedidoService.crear(ctx.clienteId, {
+        sucursalId: sucursal.id,
+        contactoTelefono: conv.contacto,
+        clienteFinalId: clienteFinal.id,
+        conversacionId: ctx.conversacionId,
+        items: itemsFormato,
+        subtotal: totalGeneral,
+        descuento: 0,
+        total,
+        tipoEntrega: tipoEntrega as any,
+        direccionEntrega: direccion ? { direccion } : undefined,
+        notas,
+      }, USUARIO_SISTEMA)
+
+      return { texto: `[Sistema: Pedido creado con código ${pedido.codigoPedido}. Comunícalo al cliente de manera natural.]` }
+    } catch (err: any) {
+      this.logger.error(`[crearPedido] ERROR: ${err.message}`)
+      return { texto: `[Sistema: error al crear pedido: ${err.message}]` }
+    }
+  }
+
+  private async consultarStockSucursal(input: any, ctx: ToolContexto): Promise<ToolResult> {
+    try {
+      const nombreProducto = String(input?.nombreProducto || '').trim()
+      const nombreSucursal = String(input?.sucursal || '').trim()
+
+      if (!nombreProducto || !nombreSucursal) {
+        return { texto: '[Sistema: consultar_stock_sucursal necesita nombreProducto y sucursal.]' }
+      }
+
+      // Buscar sucursal por nombre o código
+      const sucursales = await this.sucursalService.listar(ctx.clienteId, true)
+      const sucursal = sucursales.find(s =>
+        s.nombre.toLowerCase().includes(nombreSucursal.toLowerCase()) ||
+        s.codigo.toUpperCase() === nombreSucursal.toUpperCase()
+      )
+
+      if (!sucursal) {
+        return { texto: `[Sistema: no encontré sucursal "${nombreSucursal}". Disponibles: ${sucursales.map(s => s.nombre).join(', ')}]` }
+      }
+
+      // Buscar producto en la sucursal
+      const inventarios = await this.inventarioService.listarPorSucursal(sucursal.id)
+      const inventario = inventarios.find(inv => inv.productoId)
+
+      if (!inventario) {
+        return { texto: `No tengo stock de "${nombreProducto}" en la sucursal ${sucursal.nombre} registrado en nuestro sistema.` }
+      }
+
+      const stock = inventario.stock ?? -1
+      const disponibilidad = stock < 0 ? 'Stock ilimitado' : stock > 0 ? `${stock} unidades` : 'Sin stock'
+
+      return { texto: `En ${sucursal.nombre}: ${disponibilidad} de "${nombreProducto}".` }
+    } catch (err: any) {
+      this.logger.error(`[consultarStockSucursal] ERROR: ${err.message}`)
+      return { texto: `[Sistema: error al consultar stock: ${err.message}]` }
+    }
+  }
+
+  private async consultarEstadoPedido(input: any, ctx: ToolContexto): Promise<ToolResult> {
+    try {
+      const codigoPedido = String(input?.codigoPedido || '').trim()
+
+      if (!codigoPedido) {
+        return { texto: '[Sistema: consultar_estado_pedido necesita codigoPedido (ej. "LPZ-00001").]' }
+      }
+
+      const pedido = await this.pedidoService.obtenerPorCodigo(codigoPedido, ctx.clienteId)
+
+      const estadosLegibles: Record<string, string> = {
+        'pendiente_confirmacion': 'Pendiente de confirmación',
+        'confirmado': 'Confirmado',
+        'en_preparacion': 'En preparación',
+        'listo': 'Listo para retirar',
+        'en_camino': 'En camino',
+        'entregado': 'Entregado',
+        'cancelado': 'Cancelado',
+      }
+
+      const estado = estadosLegibles[pedido.estadoPedido] || pedido.estadoPedido
+
+      return { texto: `Pedido ${codigoPedido}: ${estado}. Total: $${pedido.total}.` }
+    } catch (err: any) {
+      this.logger.error(`[consultarEstadoPedido] ERROR: ${err.message}`)
+      return { texto: `No encontré el pedido ${input?.codigoPedido}. Verifica el código e intenta de nuevo.` }
     }
   }
 

@@ -17,18 +17,17 @@ exports.RecursoService = void 0;
 const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
-const config_1 = require("@nestjs/config");
 const fs_1 = require("fs");
 const path_1 = require("path");
 const recurso_entity_1 = require("../entity/recurso.entity");
 const base_service_1 = require("../../../common/base/base-service");
 const constants_1 = require("../../../common/constants");
 const recurso_constants_1 = require("../recurso.constants");
+const url_assets_util_1 = require("../../../common/lib/url-assets.util");
 let RecursoService = RecursoService_1 = class RecursoService extends base_service_1.BaseService {
-    constructor(recursoRepository, configService) {
+    constructor(recursoRepository) {
         super(RecursoService_1.name);
         this.recursoRepository = recursoRepository;
-        this.configService = configService;
     }
     async listar(clienteId, filtros) {
         const where = { clienteId, estado: constants_1.Status.ACTIVE };
@@ -149,8 +148,7 @@ let RecursoService = RecursoService_1 = class RecursoService extends base_servic
             return recurso.urlExterna;
         }
         if (recurso.archivoLocal) {
-            const appUrl = (this.configService.get('APP_URL') || 'http://localhost:3001').replace(/\/$/, '');
-            return `${appUrl}/uploads/recursos/${clienteId}/${recurso.archivoLocal}`;
+            return `${(0, url_assets_util_1.baseUrlAssets)()}/uploads/recursos/${clienteId}/${recurso.archivoLocal}`;
         }
         throw new common_1.BadRequestException('Recurso no tiene URL');
     }
@@ -170,8 +168,7 @@ let RecursoService = RecursoService_1 = class RecursoService extends base_servic
 RecursoService = RecursoService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(recurso_entity_1.Recurso)),
-    __metadata("design:paramtypes", [typeorm_2.Repository,
-        config_1.ConfigService])
+    __metadata("design:paramtypes", [typeorm_2.Repository])
 ], RecursoService);
 exports.RecursoService = RecursoService;
 //# sourceMappingURL=recurso.service.js.map

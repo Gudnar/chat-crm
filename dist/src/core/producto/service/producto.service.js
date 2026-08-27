@@ -42,20 +42,18 @@ const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const fs_1 = require("fs");
 const path_1 = require("path");
-const config_1 = require("@nestjs/config");
 const ExcelJS = __importStar(require("exceljs"));
 const producto_entity_1 = require("../entity/producto.entity");
 const base_service_1 = require("../../../common/base/base-service");
 const constants_1 = require("../../../common/constants");
+const url_assets_util_1 = require("../../../common/lib/url-assets.util");
 let ProductoService = ProductoService_1 = class ProductoService extends base_service_1.BaseService {
-    constructor(repo, configService) {
+    constructor(repo) {
         super(ProductoService_1.name);
         this.repo = repo;
-        this.configService = configService;
     }
     construirUrlImagen(filename) {
-        const appUrl = (this.configService.get('APP_URL') || 'http://localhost:3001').replace(/\/$/, '');
-        return `${appUrl}/uploads/${filename}`;
+        return `${(0, url_assets_util_1.baseUrlAssets)()}/uploads/${filename}`;
     }
     resolverUrlsImagenes(filenames) {
         return (filenames || []).map(f => this.construirUrlImagen(f));
@@ -527,8 +525,7 @@ let ProductoService = ProductoService_1 = class ProductoService extends base_ser
 ProductoService = ProductoService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(producto_entity_1.Producto)),
-    __metadata("design:paramtypes", [typeorm_2.Repository,
-        config_1.ConfigService])
+    __metadata("design:paramtypes", [typeorm_2.Repository])
 ], ProductoService);
 exports.ProductoService = ProductoService;
 //# sourceMappingURL=producto.service.js.map

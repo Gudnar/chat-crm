@@ -71,6 +71,21 @@ export class CreateClienteDto {
   @IsOptional()
   @IsArray()
   horarios?: { dia: string; franjas: { inicio: string; fin: string }[] }[]
+
+  @ApiProperty({ required: false, description: 'Activa la tienda online pública en /tienda/:slug' })
+  @IsOptional()
+  @IsBoolean()
+  tiendaActiva?: boolean
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsString()
+  tiendaPortadaUrl?: string
+
+  @ApiProperty({ required: false, example: '#2563eb', description: 'Color primario de la tienda online (hex)' })
+  @IsOptional()
+  @IsString()
+  tiendaColorPrimario?: string
 }
 
 export class UpdateClienteDto extends CreateClienteDto {

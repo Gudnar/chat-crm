@@ -1,13 +1,11 @@
 /// <reference types="node" />
 import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
 import { Producto } from '../entity/producto.entity';
 import { CreateProductoDto, UpdateProductoDto } from '../dto/create-producto.dto';
 import { BaseService } from '../../../common/base/base-service';
 export declare class ProductoService extends BaseService {
     private readonly repo;
-    private readonly configService;
-    constructor(repo: Repository<Producto>, configService: ConfigService);
+    constructor(repo: Repository<Producto>);
     construirUrlImagen(filename: string): string;
     resolverUrlsImagenes(filenames: string[]): string[];
     listar(clienteId: string, q?: string, categoria?: string, pagina?: number, limite?: number, soloActivos?: boolean): Promise<{

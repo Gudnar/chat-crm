@@ -18,12 +18,14 @@ const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
 const horario_agente_entity_1 = require("../entity/horario-agente.entity");
+const excepcion_horario_agente_service_1 = require("./excepcion-horario-agente.service");
 const base_service_1 = require("../../../common/base/base-service");
 const constants_1 = require("../../../common/constants");
 let HorarioAgenteService = HorarioAgenteService_1 = class HorarioAgenteService extends base_service_1.BaseService {
-    constructor(horarioAgenteRepository) {
+    constructor(horarioAgenteRepository, excepcionHorarioAgenteService) {
         super(HorarioAgenteService_1.name);
         this.horarioAgenteRepository = horarioAgenteRepository;
+        this.excepcionHorarioAgenteService = excepcionHorarioAgenteService;
     }
     async listarPorAgente(agenteId, clienteId) {
         return this.horarioAgenteRepository.find({
@@ -54,6 +56,10 @@ let HorarioAgenteService = HorarioAgenteService_1 = class HorarioAgenteService e
         await this.horarioAgenteRepository.save(horario);
     }
     async generarSlotsBase(agenteId, clienteId, fecha, duracionMinutos) {
+        const { bloqueada } = await this.excepcionHorarioAgenteService.estaBloqueada(agenteId, clienteId, fecha);
+        if (bloqueada)
+            return [];
+        const bloqueosParciales = await this.excepcionHorarioAgenteService.obtenerBloqueosParciales(agenteId, clienteId, fecha);
         const diaSemana = new Date(`${fecha}T00:00:00`).getDay();
         const horarios = await this.horarioAgenteRepository.find({
             where: { agenteId, clienteId, diaSemana, activo: true, estado: constants_1.Status.ACTIVE },
@@ -64,7 +70,14 @@ let HorarioAgenteService = HorarioAgenteService_1 = class HorarioAgenteService e
             const inicioMin = this.aMinutos(horario.horaInicio);
             const finMin = this.aMinutos(horario.horaFin);
             for (let m = inicioMin; m + duracionMinutos <= finMin; m += duracionMinutos) {
-                slots.push(this.aHHmm(m));
+                const slotFin = m + duracionMinutos;
+                const chocaConBloqueo = bloqueosParciales.some(b => {
+                    const bIni = this.aMinutos(b.horaInicio);
+                    const bFin = this.aMinutos(b.horaFin);
+                    return m < bFin && slotFin > bIni;
+                });
+                if (!chocaConBloqueo)
+                    slots.push(this.aHHmm(m));
             }
         }
         return slots;
@@ -82,7 +95,8 @@ let HorarioAgenteService = HorarioAgenteService_1 = class HorarioAgenteService e
 HorarioAgenteService = HorarioAgenteService_1 = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(horario_agente_entity_1.HorarioAgente)),
-    __metadata("design:paramtypes", [typeorm_2.Repository])
+    __metadata("design:paramtypes", [typeorm_2.Repository,
+        excepcion_horario_agente_service_1.ExcepcionHorarioAgenteService])
 ], HorarioAgenteService);
 exports.HorarioAgenteService = HorarioAgenteService;
 //# sourceMappingURL=horario-agente.service.js.map

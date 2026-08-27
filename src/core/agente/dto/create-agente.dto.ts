@@ -92,6 +92,11 @@ export class CreateAgenteDto {
   @IsOptional()
   @IsString()
   recordatorioCitaPlantillaId?: string
+
+  @ApiProperty({ required: false, description: 'Transcribe las notas de voz del cliente antes de pasarlas al agente' })
+  @IsOptional()
+  @IsBoolean()
+  transcribirAudios?: boolean
 }
 
 export class UpdateAgenteDto extends CreateAgenteDto {

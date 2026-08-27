@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common'
-import { ConfigService } from '@nestjs/config'
 import axios from 'axios'
 import { existsSync, mkdirSync, writeFileSync } from 'fs'
 import { join } from 'path'
@@ -10,8 +9,10 @@ import { ConfiguracionClienteService } from '../../cliente/service/configuracion
 import { HerramientaService } from '../../herramienta/service/herramienta.service'
 import { ToolExecutorService, ToolDocumento, ToolOpciones, ToolBotonLink, ToolSolicitudUbicacion, ToolFlow } from '../../herramienta/service/tool-executor.service'
 import { BaseConocimientoService } from '../../base-conocimiento/service/base-conocimiento.service'
+import { TranscripcionAudioService } from './transcripcion-audio.service'
 import { WaWebhookMessage } from '../dto/whatsapp.dto'
 import { USUARIO_SISTEMA, TipoAgente } from '../../../common/constants'
+import { baseUrlAssets } from '../../../common/lib/url-assets.util'
 
 const ANTHROPIC_API = 'https://api.anthropic.com/v1/messages'
 const MAX_HISTORY_MESSAGES = 20
@@ -47,7 +48,7 @@ export class WhatsappWebhookService {
     private readonly herramientaService: HerramientaService,
     private readonly toolExecutor: ToolExecutorService,
     private readonly baseConocimientoService: BaseConocimientoService,
-    private readonly configService: ConfigService,
+    private readonly transcripcionService: TranscripcionAudioService,
   ) {}
 
   // ── Main entry point ─────────────────────────────────────────
@@ -57,11 +58,17 @@ export class WhatsappWebhookService {
     contactName: string,
     phoneNumberId: string,
   ): Promise<void> {
-    const textoUsuario = this.extraerTexto(rawMessage)
-    if (!textoUsuario) {
+    const textoExtraido = this.extraerTexto(rawMessage)
+    if (!textoExtraido) {
       this.logger.log(`[WA] Tipo no soportado: ${rawMessage.type} — ignorado`)
       return
     }
+
+    // Detecta de dónde vino el contacto (anuncio Click-to-WhatsApp o un link propio
+    // etiquetado manualmente) y limpia cualquier tag de tracking del texto ANTES de
+    // que se persista o llegue a Claude — el cliente/el modelo nunca deben verlo.
+    const origen = this.extraerOrigen(rawMessage, textoExtraido)
+    const textoUsuario = origen.textoLimpio
 
     const from = rawMessage.from
 
@@ -94,16 +101,29 @@ export class WhatsappWebhookService {
         return
       }
 
-      const conversacion = await this.encontrarOCrearConversacion(from, contactName, agente.id, clienteId)
+      const conversacion = await this.encontrarOCrearConversacion(from, contactName, agente.id, clienteId, origen)
 
-      let adjunto: { url: string; tipo: string; nombre?: string } | undefined
+      let adjunto: { url: string; tipo: string; nombre?: string; buffer: Buffer; mimeType: string } | undefined
       if (this.esMensajeConAdjunto(rawMessage)) {
         adjunto = (await this.descargarYGuardarAdjunto(rawMessage, config)) ?? undefined
       }
 
+      let textoFinal = textoUsuario
+      if (rawMessage.type === 'audio' && agente.transcribirAudios && adjunto?.buffer) {
+        const transcripcion = await this.transcripcionService.transcribir(adjunto.buffer, adjunto.mimeType, clienteId)
+        if (transcripcion) textoFinal = transcripcion
+      }
+
       const ubicacion = this.extraerUbicacion(rawMessage)
       const respuestaFlow = this.extraerRespuestaFlow(rawMessage)
-      await this.conversacionService.agregarMensaje(conversacion.id, { role: 'user', content: textoUsuario, adjunto, ubicacion, respuestaFlow })
+      const adjuntoPersistible = adjunto ? { url: adjunto.url, tipo: adjunto.tipo, nombre: adjunto.nombre } : undefined
+      await this.conversacionService.agregarMensaje(conversacion.id, {
+        role: 'user',
+        content: textoFinal,
+        adjunto: adjuntoPersistible,
+        ubicacion,
+        respuestaFlow,
+      })
 
       // Canal atendido directamente por una persona del equipo (no un agente IA):
       // el mensaje queda guardado y asignado para que el humano responda desde el
@@ -272,7 +292,7 @@ export class WhatsappWebhookService {
   private async descargarYGuardarAdjunto(
     msg: WaWebhookMessage,
     config: WaConfig,
-  ): Promise<{ url: string; tipo: string; nombre?: string } | null> {
+  ): Promise<{ url: string; tipo: string; nombre?: string; buffer: Buffer; mimeType: string } | null> {
     const media = msg.image || msg.document || msg.audio
     if (!media) return null
 
@@ -284,11 +304,12 @@ export class WhatsappWebhookService {
       if (!existsSync(dir)) mkdirSync(dir, { recursive: true })
       writeFileSync(join(dir, filename), buffer)
 
-      const appUrl = (this.configService.get<string>('APP_URL') || 'http://localhost:3001').replace(/\/$/, '')
       return {
-        url: `${appUrl}/uploads/whatsapp-adjuntos/${filename}`,
+        url: `${baseUrlAssets()}/uploads/whatsapp-adjuntos/${filename}`,
         tipo: msg.type,
         nombre: msg.type === 'document' ? (msg.document?.filename || filename) : undefined,
+        buffer,
+        mimeType,
       }
     } catch (err: any) {
       this.logger.error(`[WA] No se pudo descargar adjunto (${media.id}): ${err.message}`)
@@ -306,7 +327,13 @@ export class WhatsappWebhookService {
     return mapa[base] || (tipoMsg === 'document' ? '' : '.bin')
   }
 
-  private async encontrarOCrearConversacion(from: string, contactName: string, agenteId: string, clienteId: string) {
+  private async encontrarOCrearConversacion(
+    from: string,
+    contactName: string,
+    agenteId: string,
+    clienteId: string,
+    origen: { fuente: string | null; refId: string | null; detalle: Record<string, any> | null },
+  ) {
     // Sin el filtro por agenteId: el historial de un contacto es continuo por
     // número + canal, independiente de qué agente esté configurado en el canal
     // en este momento. Filtrar por agenteId hacía que cada cambio de agente en
@@ -336,10 +363,54 @@ export class WhatsappWebhookService {
         canal: 'whatsapp',
         etiquetas: [],
         notas: contactName !== from ? `Nombre: ${contactName}` : undefined,
+        origenFuente: origen.fuente ?? undefined,
+        origenRefId: origen.refId ?? undefined,
+        origenDetalle: origen.detalle ?? undefined,
       },
       USUARIO_SISTEMA,
       clienteId,
     )
+  }
+
+  /**
+   * De dónde vino el contacto:
+   *  1. `referral` en el webhook → clic real en un anuncio Click-to-WhatsApp de Meta.
+   *  2. Un tag `[ref:algo]` en el texto del primer mensaje → link wa.me propio
+   *     (bio, web, QR) etiquetado a mano. Se quita del texto antes de devolverlo.
+   *  3. Ninguno de los dos → tráfico directo, sin origen identificable.
+   */
+  private extraerOrigen(
+    rawMessage: WaWebhookMessage,
+    texto: string,
+  ): { fuente: string | null; refId: string | null; detalle: Record<string, any> | null; textoLimpio: string } {
+    const referral = rawMessage.referral
+    if (referral) {
+      return {
+        fuente: 'meta_ads',
+        refId: referral.source_id || null,
+        detalle: {
+          headline: referral.headline,
+          body: referral.body,
+          sourceUrl: referral.source_url,
+          sourceType: referral.source_type,
+          mediaType: referral.media_type,
+          ctwaClid: referral.ctwa_clid,
+        },
+        textoLimpio: texto,
+      }
+    }
+
+    const match = texto.match(/\[ref:([a-z0-9_-]+)\]/i)
+    if (match) {
+      return {
+        fuente: match[1].toLowerCase(),
+        refId: null,
+        detalle: {},
+        textoLimpio: texto.replace(match[0], '').replace(/[ \t]{2,}/g, ' ').trim(),
+      }
+    }
+
+    return { fuente: null, refId: null, detalle: null, textoLimpio: texto }
   }
 
   private async llamarClaude(

@@ -8,10 +8,14 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 var ToolExecutorService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ToolExecutorService = void 0;
 const common_1 = require("@nestjs/common");
+const config_1 = require("@nestjs/config");
 const path_1 = require("path");
 const conversacion_service_1 = require("../../conversacion/service/conversacion.service");
 const producto_service_1 = require("../../producto/service/producto.service");
@@ -20,16 +24,27 @@ const recurso_service_1 = require("../../recurso/service/recurso.service");
 const recurso_entity_1 = require("../../recurso/entity/recurso.entity");
 const reservacion_service_1 = require("../../reservacion/service/reservacion.service");
 const flow_whatsapp_service_1 = require("../../whatsapp/service/flow-whatsapp.service");
+const tienda_publica_service_1 = require("../../tienda/service/tienda-publica.service");
+const pedido_service_1 = require("../../sucursal/service/pedido.service");
+const inventario_sucursal_service_1 = require("../../sucursal/service/inventario-sucursal.service");
+const sucursal_service_1 = require("../../sucursal/service/sucursal.service");
+const cliente_final_service_1 = require("../../sucursal/service/cliente-final.service");
 const constants_1 = require("../../../common/constants");
 const fecha_bolivia_util_1 = require("../../../common/lib/fecha-bolivia.util");
 let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
-    constructor(conversacionService, productoService, confClienteService, recursoService, reservacionService, flowWhatsappService) {
+    constructor(conversacionService, productoService, confClienteService, recursoService, reservacionService, flowWhatsappService, tiendaPublicaService, pedidoService, inventarioService, sucursalService, clienteFinalService, configService) {
         this.conversacionService = conversacionService;
         this.productoService = productoService;
         this.confClienteService = confClienteService;
         this.recursoService = recursoService;
         this.reservacionService = reservacionService;
         this.flowWhatsappService = flowWhatsappService;
+        this.tiendaPublicaService = tiendaPublicaService;
+        this.pedidoService = pedidoService;
+        this.inventarioService = inventarioService;
+        this.sucursalService = sucursalService;
+        this.clienteFinalService = clienteFinalService;
+        this.configService = configService;
         this.logger = new common_1.Logger(ToolExecutorService_1.name);
     }
     async ejecutar(nombre, input, contexto) {
@@ -50,6 +65,10 @@ let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
                 case 'solicitar_ubicacion': return await this.solicitarUbicacion(input, contexto);
                 case 'iniciar_flow': return await this.iniciarFlow(input, contexto);
                 case 'reservar_producto': return await this.reservarProducto(input, contexto);
+                case 'abrir_tienda': return await this.abrirTienda(input, contexto);
+                case 'crear_pedido': return await this.crearPedido(input, contexto);
+                case 'consultar_stock_sucursal': return await this.consultarStockSucursal(input, contexto);
+                case 'consultar_estado_pedido': return await this.consultarEstadoPedido(input, contexto);
                 default:
                     this.logger.warn(`[Tool] Herramienta desconocida: ${nombre}`);
                     return { texto: `Herramienta "${nombre}" no está implementada.` };
@@ -136,6 +155,24 @@ let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
                 cta: flow.cta,
                 screenId: this.flowWhatsappService.obtenerScreenId(),
             },
+        };
+    }
+    async abrirTienda(input, ctx) {
+        const mensaje = String(input?.mensaje || '').trim() || 'Podés armar tu pedido directo desde acá 🛍️';
+        const conversacion = await this.conversacionService.obtener(ctx.conversacionId).catch(() => null);
+        const contactoTelefono = conversacion?.contacto;
+        if (!contactoTelefono) {
+            return { texto: '[Sistema: no se pudo resolver el contacto de esta conversación. No se abrió la tienda.]' };
+        }
+        const resultado = await this.tiendaPublicaService.abrirParaConversacion(ctx.clienteId, ctx.conversacionId, contactoTelefono);
+        if (!resultado.ok) {
+            return { texto: `[Sistema: ${resultado.error} No se envió nada — seguí atendiendo al cliente por texto normal.]` };
+        }
+        const frontendUrl = (this.configService.get('FRONTEND_URL') || 'http://localhost:8083').replace(/\/$/, '');
+        const url = `${frontendUrl}/tienda/${resultado.slug}?s=${resultado.token}`;
+        return {
+            texto: `[Sistema: se le mandó al cliente el link de la tienda online. Espera a que arme y confirme su pedido — no inventes ni asumas qué eligió.]`,
+            botonLink: { mensaje, textoBoton: 'Ver catálogo 🛍️', url },
         };
     }
     async crearNota(input, ctx) {
@@ -335,6 +372,115 @@ let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
             return { texto: `[Sistema: error interno al buscar recurso: ${err.message}]` };
         }
     }
+    async crearPedido(input, ctx) {
+        try {
+            const items = Array.isArray(input?.items) ? input.items : [];
+            const tipoEntrega = input?.tipoEntrega || 'recojo';
+            const direccion = input?.direccion;
+            const notas = input?.notas;
+            if (!items.length) {
+                return { texto: '[Sistema: crear_pedido necesita al menos 1 item. No se creó pedido.]' };
+            }
+            const conv = await this.conversacionService.obtener(ctx.conversacionId);
+            const sucursales = await this.sucursalService.listar(ctx.clienteId, true);
+            if (!sucursales.length) {
+                return { texto: '[Sistema: no hay sucursales activas para crear el pedido.]' };
+            }
+            const sucursal = sucursales[0];
+            let totalGeneral = 0;
+            const itemsFormato = items.map((item) => {
+                const cantidad = Number(item.cantidad) || 1;
+                const precioUnitario = Number(item.precioUnitario) || 0;
+                const itemSubtotal = cantidad * precioUnitario;
+                totalGeneral += itemSubtotal;
+                return {
+                    productoId: `${item.nombre}`.toLowerCase(),
+                    nombre: item.nombre,
+                    cantidad,
+                    precioUnitario,
+                    subtotal: itemSubtotal,
+                };
+            });
+            const total = totalGeneral;
+            let clienteFinal = await this.clienteFinalService.buscarPorTelefono(ctx.clienteId, conv.contacto);
+            if (!clienteFinal) {
+                clienteFinal = await this.clienteFinalService.crear(ctx.clienteId, {
+                    nombre: conv.contacto,
+                    telefono: conv.contacto,
+                    sucursalId: sucursal.id,
+                }, constants_1.USUARIO_SISTEMA);
+            }
+            const pedido = await this.pedidoService.crear(ctx.clienteId, {
+                sucursalId: sucursal.id,
+                contactoTelefono: conv.contacto,
+                clienteFinalId: clienteFinal.id,
+                conversacionId: ctx.conversacionId,
+                items: itemsFormato,
+                subtotal: totalGeneral,
+                descuento: 0,
+                total,
+                tipoEntrega: tipoEntrega,
+                direccionEntrega: direccion ? { direccion } : undefined,
+                notas,
+            }, constants_1.USUARIO_SISTEMA);
+            return { texto: `[Sistema: Pedido creado con código ${pedido.codigoPedido}. Comunícalo al cliente de manera natural.]` };
+        }
+        catch (err) {
+            this.logger.error(`[crearPedido] ERROR: ${err.message}`);
+            return { texto: `[Sistema: error al crear pedido: ${err.message}]` };
+        }
+    }
+    async consultarStockSucursal(input, ctx) {
+        try {
+            const nombreProducto = String(input?.nombreProducto || '').trim();
+            const nombreSucursal = String(input?.sucursal || '').trim();
+            if (!nombreProducto || !nombreSucursal) {
+                return { texto: '[Sistema: consultar_stock_sucursal necesita nombreProducto y sucursal.]' };
+            }
+            const sucursales = await this.sucursalService.listar(ctx.clienteId, true);
+            const sucursal = sucursales.find(s => s.nombre.toLowerCase().includes(nombreSucursal.toLowerCase()) ||
+                s.codigo.toUpperCase() === nombreSucursal.toUpperCase());
+            if (!sucursal) {
+                return { texto: `[Sistema: no encontré sucursal "${nombreSucursal}". Disponibles: ${sucursales.map(s => s.nombre).join(', ')}]` };
+            }
+            const inventarios = await this.inventarioService.listarPorSucursal(sucursal.id);
+            const inventario = inventarios.find(inv => inv.productoId);
+            if (!inventario) {
+                return { texto: `No tengo stock de "${nombreProducto}" en la sucursal ${sucursal.nombre} registrado en nuestro sistema.` };
+            }
+            const stock = inventario.stock ?? -1;
+            const disponibilidad = stock < 0 ? 'Stock ilimitado' : stock > 0 ? `${stock} unidades` : 'Sin stock';
+            return { texto: `En ${sucursal.nombre}: ${disponibilidad} de "${nombreProducto}".` };
+        }
+        catch (err) {
+            this.logger.error(`[consultarStockSucursal] ERROR: ${err.message}`);
+            return { texto: `[Sistema: error al consultar stock: ${err.message}]` };
+        }
+    }
+    async consultarEstadoPedido(input, ctx) {
+        try {
+            const codigoPedido = String(input?.codigoPedido || '').trim();
+            if (!codigoPedido) {
+                return { texto: '[Sistema: consultar_estado_pedido necesita codigoPedido (ej. "LPZ-00001").]' };
+            }
+            const pedido = await this.pedidoService.obtenerPorCodigo(codigoPedido, ctx.clienteId);
+            const estadosLegibles = {
+                'pendiente_confirmacion': 'Pendiente de confirmación',
+                'confirmado': 'Confirmado',
+                'en_preparacion': 'En preparación',
+                'listo': 'Listo para retirar',
+                'en_camino': 'En camino',
+                'entregado': 'Entregado',
+                'cancelado': 'Cancelado',
+            };
+            const estado = estadosLegibles[pedido.estadoPedido] || pedido.estadoPedido;
+            return { texto: `Pedido ${codigoPedido}: ${estado}. Total: $${pedido.total}.` };
+        }
+        catch (err) {
+            this.logger.error(`[consultarEstadoPedido] ERROR: ${err.message}`);
+            return { texto: `No encontré el pedido ${input?.codigoPedido}. Verifica el código e intenta de nuevo.` };
+        }
+    }
     nombreArchivo(recurso) {
         let ext = '';
         if (recurso.archivoLocal) {
@@ -352,12 +498,19 @@ let ToolExecutorService = ToolExecutorService_1 = class ToolExecutorService {
 };
 ToolExecutorService = ToolExecutorService_1 = __decorate([
     (0, common_1.Injectable)(),
+    __param(6, (0, common_1.Inject)((0, common_1.forwardRef)(() => tienda_publica_service_1.TiendaPublicaService))),
     __metadata("design:paramtypes", [conversacion_service_1.ConversacionService,
         producto_service_1.ProductoService,
         configuracion_cliente_service_1.ConfiguracionClienteService,
         recurso_service_1.RecursoService,
         reservacion_service_1.ReservacionService,
-        flow_whatsapp_service_1.FlowWhatsappService])
+        flow_whatsapp_service_1.FlowWhatsappService,
+        tienda_publica_service_1.TiendaPublicaService,
+        pedido_service_1.PedidoService,
+        inventario_sucursal_service_1.InventarioSucursalService,
+        sucursal_service_1.SucursalService,
+        cliente_final_service_1.ClienteFinalService,
+        config_1.ConfigService])
 ], ToolExecutorService);
 exports.ToolExecutorService = ToolExecutorService;
 //# sourceMappingURL=tool-executor.service.js.map

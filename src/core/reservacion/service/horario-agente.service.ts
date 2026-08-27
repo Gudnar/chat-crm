@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
 import { HorarioAgente } from '../entity/horario-agente.entity'
 import { CreateHorarioAgenteDto } from '../dto/horario-agente.dto'
+import { ExcepcionHorarioAgenteService } from './excepcion-horario-agente.service'
 import { BaseService } from '../../../common/base/base-service'
 import { Status, Transacccion } from '../../../common/constants'
 
@@ -11,6 +12,7 @@ export class HorarioAgenteService extends BaseService {
   constructor(
     @InjectRepository(HorarioAgente)
     private readonly horarioAgenteRepository: Repository<HorarioAgente>,
+    private readonly excepcionHorarioAgenteService: ExcepcionHorarioAgenteService,
   ) {
     super(HorarioAgenteService.name)
   }
@@ -52,6 +54,11 @@ export class HorarioAgenteService extends BaseService {
    * dependencia circular entre servicios).
    */
   async generarSlotsBase(agenteId: string, clienteId: string, fecha: string, duracionMinutos: number): Promise<string[]> {
+    const { bloqueada } = await this.excepcionHorarioAgenteService.estaBloqueada(agenteId, clienteId, fecha)
+    if (bloqueada) return []
+
+    const bloqueosParciales = await this.excepcionHorarioAgenteService.obtenerBloqueosParciales(agenteId, clienteId, fecha)
+
     const diaSemana = new Date(`${fecha}T00:00:00`).getDay()
 
     const horarios = await this.horarioAgenteRepository.find({
@@ -64,7 +71,14 @@ export class HorarioAgenteService extends BaseService {
       const inicioMin = this.aMinutos(horario.horaInicio)
       const finMin = this.aMinutos(horario.horaFin)
       for (let m = inicioMin; m + duracionMinutos <= finMin; m += duracionMinutos) {
-        slots.push(this.aHHmm(m))
+        const slotFin = m + duracionMinutos
+        // Un slot se descarta si se solapa con cualquier bloqueo puntual (ej. un evento de Google Calendar).
+        const chocaConBloqueo = bloqueosParciales.some(b => {
+          const bIni = this.aMinutos(b.horaInicio)
+          const bFin = this.aMinutos(b.horaFin)
+          return m < bFin && slotFin > bIni
+        })
+        if (!chocaConBloqueo) slots.push(this.aHHmm(m))
       }
     }
     return slots

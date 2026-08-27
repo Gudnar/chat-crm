@@ -28,12 +28,16 @@ export class ConfiguracionClienteService extends BaseService {
   }
 
   async set(clienteId: string, dto: SetConfiguracionClienteDto, usuarioCreacion: string): Promise<ConfiguracionCliente> {
-    const existe = await this.obtenerPorClave(clienteId, dto.clave)
+    // Busca sin filtrar por estado: el índice único (clienteId, clave) sigue ocupado por
+    // una fila eliminada (soft-delete), así que si solo mirásemos las activas, guardar de
+    // nuevo la misma clave después de borrarla chocaría con esa fila fantasma.
+    const existe = await this.repo.findOne({ where: { clienteId, clave: dto.clave } })
     if (existe) {
       Object.assign(existe, {
         valor: dto.valor,
         descripcion: dto.descripcion ?? existe.descripcion,
         esSecreto: dto.esSecreto ?? existe.esSecreto,
+        estado: Status.ACTIVE,
         transaccion: Transacccion.ACTUALIZAR,
         usuarioModificacion: usuarioCreacion,
       })

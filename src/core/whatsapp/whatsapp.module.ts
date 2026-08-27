@@ -5,6 +5,7 @@ import { PlantillaWhatsappController } from './controller/plantilla-whatsapp.con
 import { FlowWhatsappController } from './controller/flow-whatsapp.controller'
 import { WhatsappService } from './service/whatsapp.service'
 import { WhatsappWebhookService } from './service/whatsapp-webhook.service'
+import { TranscripcionAudioService } from './service/transcripcion-audio.service'
 import { RecordatorioService } from './service/recordatorio.service'
 import { RecordatorioCitaService } from './service/recordatorio-cita.service'
 import { PlantillaWhatsappService } from './service/plantilla-whatsapp.service'
@@ -21,6 +22,8 @@ import { ProductoModule } from '../producto/producto.module'
 import { RedSocialModule } from '../red-social/red-social.module'
 import { RecursoModule } from '../recurso/recurso.module'
 import { ReservacionModule } from '../reservacion/reservacion.module'
+import { TiendaModule } from '../tienda/tienda.module'
+import { SucursalModule } from '../sucursal/sucursal.module'
 
 @Module({
   imports: [
@@ -33,10 +36,12 @@ import { ReservacionModule } from '../reservacion/reservacion.module'
     ProductoModule,
     RecursoModule,
     ReservacionModule,
+    SucursalModule,
     forwardRef(() => RedSocialModule),
+    forwardRef(() => TiendaModule),
   ],
   controllers: [WhatsappController, PlantillaWhatsappController, FlowWhatsappController],
-  providers: [WhatsappService, WhatsappWebhookService, ToolExecutorService, RecordatorioService, RecordatorioCitaService, PlantillaWhatsappService, FlowWhatsappService],
+  providers: [WhatsappService, WhatsappWebhookService, TranscripcionAudioService, ToolExecutorService, RecordatorioService, RecordatorioCitaService, PlantillaWhatsappService, FlowWhatsappService],
   exports: [WhatsappService, PlantillaWhatsappService, FlowWhatsappService],
 })
 export class WhatsappModule {}

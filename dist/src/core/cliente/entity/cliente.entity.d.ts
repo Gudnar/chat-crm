@@ -21,6 +21,9 @@ export declare class Cliente extends AuditoriaEntity {
     }[];
     servicios: string[];
     metadatos?: Record<string, any>;
+    tiendaActiva: boolean;
+    tiendaPortadaUrl?: string;
+    tiendaColorPrimario: string;
     configuraciones: ConfiguracionCliente[];
     constructor(data?: Partial<Cliente>);
 }
