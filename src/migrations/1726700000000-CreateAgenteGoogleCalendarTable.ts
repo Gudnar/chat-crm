@@ -27,7 +27,7 @@ export class CreateAgenteGoogleCalendarTable1726700000000 implements MigrationIn
           {
             name: 'google_email',
             type: 'varchar',
-            length: 200,
+            length: '200',
             isNullable: true,
           },
           {
@@ -48,7 +48,7 @@ export class CreateAgenteGoogleCalendarTable1726700000000 implements MigrationIn
           {
             name: 'calendar_id',
             type: 'varchar',
-            length: 200,
+            length: '200',
             default: "'primary'",
             isNullable: false,
           },
@@ -66,20 +66,20 @@ export class CreateAgenteGoogleCalendarTable1726700000000 implements MigrationIn
           {
             name: '_estado',
             type: 'varchar',
-            length: 50,
+            length: '50',
             default: "'ACTIVO'",
             isNullable: false,
           },
           {
             name: '_transaccion',
             type: 'varchar',
-            length: 50,
+            length: '50',
             isNullable: true,
           },
           {
             name: '_usuario_creacion',
             type: 'varchar',
-            length: 100,
+            length: '100',
             isNullable: false,
           },
           {
@@ -91,7 +91,7 @@ export class CreateAgenteGoogleCalendarTable1726700000000 implements MigrationIn
           {
             name: '_usuario_modificacion',
             type: 'varchar',
-            length: 100,
+            length: '100',
             isNullable: true,
           },
           {
