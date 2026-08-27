@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { APP_FILTER } from '@nestjs/core'
 import { ScheduleModule } from '@nestjs/schedule'
+import { ServeStaticModule } from '@nestjs/serve-static'
+import { join } from 'path'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 import { CoreModule } from './core/core.module'
 import { AppController } from './app.controller'
@@ -12,6 +14,10 @@ import { AppController } from './app.controller'
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env', '.env.dev'],
+    }),
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'uploads'),
+      serveRoot: '/uploads',
     }),
     CoreModule,
   ],
