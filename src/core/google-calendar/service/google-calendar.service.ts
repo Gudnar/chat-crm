@@ -36,7 +36,7 @@ export class GoogleCalendarService {
       this.configService.get<string>('GOOGLE_CLIENT_ID'),
       this.configService.get<string>('GOOGLE_CLIENT_SECRET'),
       this.redirectUri(),
-    )
+    ) as any
   }
 
   generarUrlAutorizacion(state: string): string {
@@ -53,7 +53,7 @@ export class GoogleCalendarService {
   async obtenerEmailCuenta(tokens: Credentials): Promise<string | undefined> {
     const client = this.nuevoCliente()
     client.setCredentials(tokens)
-    const oauth2 = google.oauth2({ version: 'v2', auth: client })
+    const oauth2 = google.oauth2({ version: 'v2', auth: client as any })
     const { data } = await oauth2.userinfo.get()
     return data.email || undefined
   }
@@ -92,7 +92,7 @@ export class GoogleCalendarService {
     onTokensRenovados: (tokens: Credentials) => void,
   ): Promise<string | null> {
     const client = this.clienteAutenticado(credenciales, onTokensRenovados)
-    const calendar = google.calendar({ version: 'v3', auth: client })
+    const calendar = google.calendar({ version: 'v3', auth: client as any })
     const { data } = await calendar.events.insert({
       calendarId: credenciales.calendarId,
       requestBody: {
@@ -113,7 +113,7 @@ export class GoogleCalendarService {
     onTokensRenovados: (tokens: Credentials) => void,
   ): Promise<void> {
     const client = this.clienteAutenticado(credenciales, onTokensRenovados)
-    const calendar = google.calendar({ version: 'v3', auth: client })
+    const calendar = google.calendar({ version: 'v3', auth: client as any })
     await calendar.events.patch({
       calendarId: credenciales.calendarId,
       eventId: googleEventId,
@@ -132,7 +132,7 @@ export class GoogleCalendarService {
     onTokensRenovados: (tokens: Credentials) => void,
   ): Promise<void> {
     const client = this.clienteAutenticado(credenciales, onTokensRenovados)
-    const calendar = google.calendar({ version: 'v3', auth: client })
+    const calendar = google.calendar({ version: 'v3', auth: client as any })
     try {
       await calendar.events.delete({ calendarId: credenciales.calendarId, eventId: googleEventId })
     } catch (err: any) {
@@ -146,7 +146,7 @@ export class GoogleCalendarService {
     onTokensRenovados: (tokens: Credentials) => void,
   ): Promise<ListaCambiosResultado> {
     const client = this.clienteAutenticado(credenciales, onTokensRenovados)
-    const calendar = google.calendar({ version: 'v3', auth: client })
+    const calendar = google.calendar({ version: 'v3', auth: client as any })
 
     try {
       const { data } = await calendar.events.list({
