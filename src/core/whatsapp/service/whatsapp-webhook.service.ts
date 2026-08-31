@@ -154,14 +154,27 @@ export class WhatsappWebhookService {
 
       // Texto escrito por Claude ANTES de invocar una tool (ej. el checklist previo
       // al envío del catálogo) — debe llegar al cliente antes que el recurso adjunto.
+      // Red de seguridad: evita mandar dos textos idénticos o muy similares seguidos.
+      const textosUnicos: string[] = []
       for (const texto of textosPrevios) {
+        if (!this.esTextoDuplicadoDe(texto, textosUnicos)) {
+          textosUnicos.push(texto)
+        } else {
+          this.logger.warn(`[WA] Se descartó un texto duplicado en textosPrevios: "${texto.slice(0, 60)}"`)
+        }
+      }
+
+      for (const texto of textosUnicos) {
         await this.conversacionService.agregarMensaje(conversacion.id, { role: 'assistant', content: texto })
         await this.waService.enviarTexto(from, texto, config)
       }
 
-      if (respuesta) {
+      // Evita mandar respuesta si es duplicada de algún texto previo
+      if (respuesta && !this.esTextoDuplicadoDe(respuesta, textosUnicos)) {
         await this.conversacionService.agregarMensaje(conversacion.id, { role: 'assistant', content: respuesta })
         await this.waService.enviarTexto(from, respuesta, config)
+      } else if (respuesta) {
+        this.logger.warn(`[WA] Se descartó respuesta duplicada: "${respuesta.slice(0, 60)}"`)
       }
       await this.agenteService.incrementarContadores(agente.id, 1)
 
@@ -512,19 +525,28 @@ export class WhatsappWebhookService {
             continue
           }
 
-          // Red de seguridad: Haiku a veces escribe "Anotado: ..." (confirmando una cita)
-          // sin haber ejecutado agendar_cita en este mismo ciclo — el cliente cree que
-          // quedó agendado y en el sistema no existe ninguna reserva. Si el agente tiene
-          // la tool disponible, el texto "confirma" pero la tool nunca corrió, forzamos
-          // UN reintento explícito antes de dejarlo pasar.
-          const pareceConfirmarCita = /anotad[oa]/i.test(textBlock?.text ?? '')
+          // Red de seguridad: detecta confirmaciones de cita sin ejecutar agendar_cita.
+          // El modelo a veces escribe palabras como "Anotado", "Listo, quedaste agendado", "confirmado",
+          // "reservado", "te llama" — sin haber ejecutado la herramienta en este mismo ciclo.
+          // El cliente cree que quedó agendado en el sistema, pero en la BD no existe ninguna reserva.
+          const patronesConfirmacion = [
+            /anotad[oa]/i,           // "Anotado", "Anotada"
+            /quedaste?\s+agendad[oa]/i, // "Quedaste agendado", "Queda agendada"
+            /listo[,.]?\s*(te\s+)?llam/i, // "Listo, te llama", "Listo, llama"
+            /confirmad[oa]/i,        // "Confirmado", "Confirmada"
+            /reservad[oa]/i,         // "Reservado", "Reservada"
+            /cita\s+(agendada|confirmada|reservada)/i, // "cita agendada/confirmada"
+            /horario.{0,20}(agendad|confirmad|reservad)/i, // "horario agendado"
+          ]
+          const pareceConfirmarCita = patronesConfirmacion.some(p => p.test(textBlock?.text ?? ''))
           const tieneAgendarCita = tools.some(t => t.name === 'agendar_cita')
+
           if (pareceConfirmarCita && tieneAgendarCita && !herramientasEjecutadas.has('agendar_cita') && !reintentoConfirmacionForzado) {
             reintentoConfirmacionForzado = true
             this.logger.warn('[WA] Texto de confirmación de cita sin ejecutar agendar_cita — forzando reintento')
             const nudge = {
               type: 'text',
-              text: '[Sistema: escribiste una confirmación de cita ("Anotado...") pero NO ejecutaste agendar_cita en este turno. Ejecuta la herramienta agendar_cita AHORA con la fecha/hora que el cliente dio, y luego redacta tu respuesta.]',
+              text: '[Sistema: CRÍTICO — escribiste una confirmación de cita (palabras como "anotado", "quedaste agendado", "confirmado", "reservado", "te llama") pero NO ejecutaste agendar_cita en este turno. Esto es obligatorio. Ejecuta AHORA agendar_cita con fecha_hora y titulo, LUEGO redacta tu confirmación. NO ESCRIBAS confirmación sin la herramienta.]',
             }
             messages.push({ role: 'assistant', content })
             messages.push({ role: 'user', content: [nudge] })
@@ -534,7 +556,7 @@ export class WhatsappWebhookService {
           if (pareceConfirmarCita && tieneAgendarCita && !herramientasEjecutadas.has('agendar_cita')) {
             // Ya reintentamos una vez y sigue sin ejecutar la tool: lo dejamos pasar pero
             // queda registrado a volumen alto para seguimiento manual (posible cita fantasma).
-            this.logger.error(`[WA] POSIBLE CITA FANTASMA: el agente ${agente.id} confirmó una cita en texto sin ejecutar agendar_cita (conversación ${conversacionId})`)
+            this.logger.error(`[WA] POSIBLE CITA FANTASMA (agente ${agente.id}, conversación ${conversacionId}): confirmó cita en texto pero NO ejecutó agendar_cita después de reintento. Requiere investigación manual.`)
           }
 
           return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos, opciones: pendingOpciones, botonesLink: pendingBotonesLink, solicitudesUbicacion: pendingSolicitudesUbicacion, flows: pendingFlows }
@@ -697,12 +719,24 @@ export class WhatsappWebhookService {
    */
   private esTextoDuplicadoDe(texto: string, cuerpos: string[]): boolean {
     const norm = this.normalizarParaComparar(texto)
-    if (!norm) return false
+    if (!norm || norm.length < 3) return false // muy corto, probablemente falso positivo
+
     return cuerpos.some((cuerpo) => {
       if (!cuerpo) return false
       const normCuerpo = this.normalizarParaComparar(cuerpo)
-      if (!normCuerpo) return false
-      return norm === normCuerpo || normCuerpo.includes(norm) || norm.includes(normCuerpo)
+      if (!normCuerpo || normCuerpo.length < 3) return false
+
+      // Comparación estricta: 80%+ de similitud (por coincidencia de palabras clave)
+      const palabrasTexto = norm.split(/\s+/)
+      const palabrasCuerpo = normCuerpo.split(/\s+/)
+
+      if (Math.abs(palabrasTexto.length - palabrasCuerpo.length) > 2) return false
+
+      const coincidencias = palabrasTexto.filter(p => palabrasCuerpo.includes(p)).length
+      const ratio = coincidencias / Math.max(palabrasTexto.length, palabrasCuerpo.length)
+
+      // Duplicado si 80%+ de palabras coinciden O uno está contenido en el otro
+      return ratio >= 0.8 || normCuerpo.includes(norm) || norm.includes(normCuerpo)
     })
   }
 }

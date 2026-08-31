@@ -283,21 +283,33 @@ export class ToolExecutorService {
         const { agente, error } = await this.reservacionService.buscarHumanoPorNombre(ctx.clienteId, nombreAgente)
         if (error || !agente) return { texto: `[Sistema: ${error}]` }
         const slots = await this.reservacionService.obtenerDisponibilidad(agente.id, ctx.clienteId, fecha, duracion)
-        if (!slots.length) return { texto: `[Sistema: ${agente.nombre} no tiene horarios disponibles el ${fecha}. Sugiere al cliente otra fecha, no inventes horarios.]` }
-        return { texto: `[Sistema: horarios REALMENTE disponibles de ${agente.nombre} el ${fecha}: ${slots.join(', ')}. Ofrece solo estas opciones, nunca inventes otras.]` }
+        if (!slots.length) return {
+          texto: `[Sistema: ${agente.nombre} CERO disponibilidad el ${fecha}. NO INVENTES. Pide al cliente otra fecha y llama consultar_disponibilidad de nuevo.]`
+        }
+        return {
+          texto: `[Sistema: horarios REALMENTE disponibles de ${agente.nombre} el ${fecha}: ${slots.join(', ')}. Ofrece SOLO estos horarios exactos, nunca otros.]`
+        }
       }
 
       // Compatibilidad con prompts antiguos que ya pasan un ID explícito
       if (agenteIdLegado) {
         const slots = await this.reservacionService.obtenerDisponibilidad(agenteIdLegado, ctx.clienteId, fecha, duracion)
-        if (!slots.length) return { texto: `[Sistema: no hay horarios disponibles el ${fecha}. Sugiere al cliente otra fecha, no inventes horarios.]` }
-        return { texto: `[Sistema: horarios REALMENTE disponibles el ${fecha}: ${slots.join(', ')}. Ofrece solo estas opciones al cliente, nunca inventes otras.]` }
+        if (!slots.length) return {
+          texto: `[Sistema: CERO horarios disponibles el ${fecha}. NO INVENTES ni ofrezcas horarios que no estén en esta lista. Pide al cliente otra fecha y llama consultar_disponibilidad de nuevo.]`
+        }
+        return {
+          texto: `[Sistema: horarios REALMENTE disponibles el ${fecha}: ${slots.join(', ')}. Ofrece SOLO estos horarios exactos al cliente.]`
+        }
       }
 
       // Sin nombre: disponibilidad combinada de todo el equipo humano
       const slots = await this.reservacionService.obtenerDisponibilidadEquipo(ctx.clienteId, fecha, duracion)
-      if (!slots.length) return { texto: `[Sistema: no hay horarios disponibles el ${fecha} en el equipo. Sugiere al cliente otra fecha, no inventes horarios.]` }
-      return { texto: `[Sistema: horarios REALMENTE disponibles el ${fecha} (equipo): ${slots.join(', ')}. Ofrece solo estas opciones al cliente, nunca inventes otras.]` }
+      if (!slots.length) return {
+        texto: `[Sistema: CERO horarios disponibles el ${fecha}. NO INVENTES ni ofrezcas horarios. Pide al cliente que elija otra fecha y vuelve a llamar consultar_disponibilidad. Nunca ofrezcas horarios que no estén en esta respuesta.]`
+      }
+      return {
+        texto: `[Sistema: horarios REALMENTE disponibles el ${fecha} (equipo): ${slots.join(', ')}. Ofrece SOLO estos horarios exactos al cliente. Si propones otros, estarás inventen horarios que no existen.]`
+      }
     } catch (err: any) {
       this.logger.warn(`[Tool] consultar_disponibilidad falló: ${err.message}`)
       return { texto: `[Sistema: no se pudo consultar disponibilidad (${err.message}).]` }
