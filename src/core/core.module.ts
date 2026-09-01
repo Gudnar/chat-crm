@@ -22,6 +22,7 @@ import { RecursoModule } from './recurso/recurso.module'
 import { ReservacionModule } from './reservacion/reservacion.module'
 import { TiendaModule } from './tienda/tienda.module'
 import { GoogleCalendarModule } from './google-calendar/google-calendar.module'
+import { ReservaModule } from './reserva/reserva.module'
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { GoogleCalendarModule } from './google-calendar/google-calendar.module'
     ReservacionModule,
     TiendaModule,
     GoogleCalendarModule,
+    ReservaModule,
   ],
 })
 export class CoreModule {}

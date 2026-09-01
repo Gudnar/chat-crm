@@ -111,13 +111,25 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
                 botonesLink.length > 0 || solicitudesUbicacion.length > 0 || flows.length > 0;
             if (!hayAlgoQueEnviar)
                 return;
+            const textosUnicos = [];
             for (const texto of textosPrevios) {
+                if (!this.esTextoDuplicadoDe(texto, textosUnicos)) {
+                    textosUnicos.push(texto);
+                }
+                else {
+                    this.logger.warn(`[WA] Se descartó un texto duplicado en textosPrevios: "${texto.slice(0, 60)}"`);
+                }
+            }
+            for (const texto of textosUnicos) {
                 await this.conversacionService.agregarMensaje(conversacion.id, { role: 'assistant', content: texto });
                 await this.waService.enviarTexto(from, texto, config);
             }
-            if (respuesta) {
+            if (respuesta && !this.esTextoDuplicadoDe(respuesta, textosUnicos)) {
                 await this.conversacionService.agregarMensaje(conversacion.id, { role: 'assistant', content: respuesta });
                 await this.waService.enviarTexto(from, respuesta, config);
+            }
+            else if (respuesta) {
+                this.logger.warn(`[WA] Se descartó respuesta duplicada: "${respuesta.slice(0, 60)}"`);
             }
             await this.agenteService.incrementarContadores(agente.id, 1);
             for (const imageUrl of imagenes) {
@@ -389,21 +401,30 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
                         }
                         continue;
                     }
-                    const pareceConfirmarCita = /anotad[oa]/i.test(textBlock?.text ?? '');
+                    const patronesConfirmacion = [
+                        /anotad[oa]/i,
+                        /quedaste?\s+agendad[oa]/i,
+                        /listo[,.]?\s*(te\s+)?llam/i,
+                        /confirmad[oa]/i,
+                        /reservad[oa]/i,
+                        /cita\s+(agendada|confirmada|reservada)/i,
+                        /horario.{0,20}(agendad|confirmad|reservad)/i,
+                    ];
+                    const pareceConfirmarCita = patronesConfirmacion.some(p => p.test(textBlock?.text ?? ''));
                     const tieneAgendarCita = tools.some(t => t.name === 'agendar_cita');
                     if (pareceConfirmarCita && tieneAgendarCita && !herramientasEjecutadas.has('agendar_cita') && !reintentoConfirmacionForzado) {
                         reintentoConfirmacionForzado = true;
                         this.logger.warn('[WA] Texto de confirmación de cita sin ejecutar agendar_cita — forzando reintento');
                         const nudge = {
                             type: 'text',
-                            text: '[Sistema: escribiste una confirmación de cita ("Anotado...") pero NO ejecutaste agendar_cita en este turno. Ejecuta la herramienta agendar_cita AHORA con la fecha/hora que el cliente dio, y luego redacta tu respuesta.]',
+                            text: '[Sistema: CRÍTICO — escribiste una confirmación de cita (palabras como "anotado", "quedaste agendado", "confirmado", "reservado", "te llama") pero NO ejecutaste agendar_cita en este turno. Esto es obligatorio. Ejecuta AHORA agendar_cita con fecha_hora y titulo, LUEGO redacta tu confirmación. NO ESCRIBAS confirmación sin la herramienta.]',
                         };
                         messages.push({ role: 'assistant', content });
                         messages.push({ role: 'user', content: [nudge] });
                         continue;
                     }
                     if (pareceConfirmarCita && tieneAgendarCita && !herramientasEjecutadas.has('agendar_cita')) {
-                        this.logger.error(`[WA] POSIBLE CITA FANTASMA: el agente ${agente.id} confirmó una cita en texto sin ejecutar agendar_cita (conversación ${conversacionId})`);
+                        this.logger.error(`[WA] POSIBLE CITA FANTASMA (agente ${agente.id}, conversación ${conversacionId}): confirmó cita en texto pero NO ejecutó agendar_cita después de reintento. Requiere investigación manual.`);
                     }
                     return { respuesta: this.sanitizarRespuesta(textBlock?.text ?? null, tools), textosPrevios, imagenes: pendingImages, documentos: pendingDocs, audios: pendingAudios, videos: pendingVideos, opciones: pendingOpciones, botonesLink: pendingBotonesLink, solicitudesUbicacion: pendingSolicitudesUbicacion, flows: pendingFlows };
                 }
@@ -510,15 +531,21 @@ let WhatsappWebhookService = WhatsappWebhookService_1 = class WhatsappWebhookSer
     }
     esTextoDuplicadoDe(texto, cuerpos) {
         const norm = this.normalizarParaComparar(texto);
-        if (!norm)
+        if (!norm || norm.length < 3)
             return false;
         return cuerpos.some((cuerpo) => {
             if (!cuerpo)
                 return false;
             const normCuerpo = this.normalizarParaComparar(cuerpo);
-            if (!normCuerpo)
+            if (!normCuerpo || normCuerpo.length < 3)
                 return false;
-            return norm === normCuerpo || normCuerpo.includes(norm) || norm.includes(normCuerpo);
+            const palabrasTexto = norm.split(/\s+/);
+            const palabrasCuerpo = normCuerpo.split(/\s+/);
+            if (Math.abs(palabrasTexto.length - palabrasCuerpo.length) > 2)
+                return false;
+            const coincidencias = palabrasTexto.filter(p => palabrasCuerpo.includes(p)).length;
+            const ratio = coincidencias / Math.max(palabrasTexto.length, palabrasCuerpo.length);
+            return ratio >= 0.8 || normCuerpo.includes(norm) || norm.includes(normCuerpo);
         });
     }
 };

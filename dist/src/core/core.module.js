@@ -31,6 +31,7 @@ const recurso_module_1 = require("./recurso/recurso.module");
 const reservacion_module_1 = require("./reservacion/reservacion.module");
 const tienda_module_1 = require("./tienda/tienda.module");
 const google_calendar_module_1 = require("./google-calendar/google-calendar.module");
+const reserva_module_1 = require("./reserva/reserva.module");
 let CoreModule = class CoreModule {
 };
 CoreModule = __decorate([
@@ -73,6 +74,7 @@ CoreModule = __decorate([
             reservacion_module_1.ReservacionModule,
             tienda_module_1.TiendaModule,
             google_calendar_module_1.GoogleCalendarModule,
+            reserva_module_1.ReservaModule,
         ],
     })
 ], CoreModule);

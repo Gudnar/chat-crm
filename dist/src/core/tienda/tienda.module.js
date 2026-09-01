@@ -23,12 +23,13 @@ const cliente_module_1 = require("../cliente/cliente.module");
 const conversacion_module_1 = require("../conversacion/conversacion.module");
 const whatsapp_module_1 = require("../whatsapp/whatsapp.module");
 const sucursal_module_1 = require("../sucursal/sucursal.module");
+const sucursal_entity_1 = require("../sucursal/entity/sucursal.entity");
 let TiendaModule = class TiendaModule {
 };
 TiendaModule = __decorate([
     (0, common_1.Module)({
         imports: [
-            typeorm_1.TypeOrmModule.forFeature([articulo_tienda_entity_1.ArticuloTienda, carrito_tienda_entity_1.CarritoTienda, categoria_tienda_entity_1.CategoriaTienda, promocion_tienda_entity_1.PromocionTienda, articulo_sucursal_entity_1.ArticuloSucursal]),
+            typeorm_1.TypeOrmModule.forFeature([articulo_tienda_entity_1.ArticuloTienda, carrito_tienda_entity_1.CarritoTienda, categoria_tienda_entity_1.CategoriaTienda, promocion_tienda_entity_1.PromocionTienda, articulo_sucursal_entity_1.ArticuloSucursal, sucursal_entity_1.Sucursal]),
             sucursal_module_1.SucursalModule,
             cliente_module_1.ClienteModule,
             conversacion_module_1.ConversacionModule,
