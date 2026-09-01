@@ -1,7 +1,7 @@
 import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm'
 import { AuditoriaEntity } from '../../../common/entity/auditoria.entity'
 
-@Entity('reserva')
+@Entity('reserva_generica')
 export class Reserva extends AuditoriaEntity {
   @PrimaryGeneratedColumn('uuid')
   id: string
