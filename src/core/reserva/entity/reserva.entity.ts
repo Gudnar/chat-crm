@@ -58,6 +58,9 @@ export class Reserva extends AuditoriaEntity {
   @Column({ name: 'hora_reserva', type: 'time', nullable: true })
   horaReserva: string
 
+  @Column({ name: 'codigo_reserva', nullable: true })
+  codigoReserva: string
+
   @Column({ name: 'duracion_minutos', nullable: true })
   duracionMinutos: number
 
