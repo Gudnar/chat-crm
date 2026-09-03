@@ -173,8 +173,16 @@ export class ProductoService extends BaseService {
 
     const { items } = await this.listar(clienteId, terminoFiltro, categoria, 1, 100, false)
 
-    this.logger.debug(`[buscar] retorna ${items.length} productos`)
-    return items
+    // Filtrar: SOLO productos con stock > 0 O fecha_disponibilidad en el futuro
+    const hoy = new Date().toISOString().split('T')[0]
+    const disponibles = items.filter(p => {
+      const tieneStock = p.stock && Number(p.stock) > 0
+      const enCamino = p.fechaDisponibilidad && p.fechaDisponibilidad > hoy
+      return tieneStock || enCamino
+    })
+
+    this.logger.debug(`[buscar] retorna ${disponibles.length} productos (filtrados de ${items.length})`)
+    return disponibles
   }
 
   /**
