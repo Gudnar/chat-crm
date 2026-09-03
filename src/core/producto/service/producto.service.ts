@@ -164,7 +164,12 @@ export class ProductoService extends BaseService {
   // ── Búsqueda para herramienta Claude ─────────────────────────
 
   async buscar(clienteId: string, termino: string, categoria?: string): Promise<Producto[]> {
-    const { items } = await this.listar(clienteId, termino, categoria, 1, 100, false)
+    // Si el término es genérico (catálogo, vehículos, productos, etc.), buscar SIN filtro por término
+    const terminosGenericos = ['catálogo', 'catalogo', 'vehículos', 'vehiculos', 'productos', 'producto', 'disponibles', 'todos']
+    const esTerminoGenerico = terminosGenericos.some(t => termino?.toLowerCase().includes(t))
+    const terminoFiltro = esTerminoGenerico ? undefined : termino
+
+    const { items } = await this.listar(clienteId, terminoFiltro, categoria, 1, 100, false)
     return items
   }
 
