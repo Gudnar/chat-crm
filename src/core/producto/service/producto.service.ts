@@ -169,7 +169,11 @@ export class ProductoService extends BaseService {
     const esTerminoGenerico = terminosGenericos.some(t => termino?.toLowerCase().includes(t))
     const terminoFiltro = esTerminoGenerico ? undefined : termino
 
+    this.logger.debug(`[buscar] termino="${termino}" genérico=${esTerminoGenerico} filtro="${terminoFiltro}"`)
+
     const { items } = await this.listar(clienteId, terminoFiltro, categoria, 1, 100, false)
+
+    this.logger.debug(`[buscar] retorna ${items.length} productos`)
     return items
   }
 
