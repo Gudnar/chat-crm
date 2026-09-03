@@ -164,7 +164,7 @@ export class ProductoService extends BaseService {
   // ── Búsqueda para herramienta Claude ─────────────────────────
 
   async buscar(clienteId: string, termino: string, categoria?: string): Promise<Producto[]> {
-    const { items } = await this.listar(clienteId, termino, categoria, 1, 10, true)
+    const { items } = await this.listar(clienteId, termino, categoria, 1, 100, false)
     return items
   }
 
