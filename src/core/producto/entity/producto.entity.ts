@@ -30,6 +30,15 @@ export class Producto extends AuditoriaEntity {
   @Column({ name: 'precio_oferta', type: 'decimal', precision: 10, scale: 2, nullable: true })
   precioOferta?: number
 
+  @Column({ name: 'precio1', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  precio1?: number
+
+  @Column({ name: 'precio2', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  precio2?: number
+
+  @Column({ name: 'precio3', type: 'decimal', precision: 10, scale: 2, nullable: true })
+  precio3?: number
+
   @Column({ name: 'moneda', length: 10, default: 'PEN' })
   moneda: string
 

@@ -56,6 +56,18 @@ __decorate([
     __metadata("design:type", Number)
 ], Producto.prototype, "precioOferta", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: 'precio1', type: 'decimal', precision: 10, scale: 2, nullable: true }),
+    __metadata("design:type", Number)
+], Producto.prototype, "precio1", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'precio2', type: 'decimal', precision: 10, scale: 2, nullable: true }),
+    __metadata("design:type", Number)
+], Producto.prototype, "precio2", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'precio3', type: 'decimal', precision: 10, scale: 2, nullable: true }),
+    __metadata("design:type", Number)
+], Producto.prototype, "precio3", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: 'moneda', length: 10, default: 'PEN' }),
     __metadata("design:type", String)
 ], Producto.prototype, "moneda", void 0);

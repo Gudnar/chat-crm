@@ -46,6 +46,27 @@ export class CreateProductoDto {
   @Min(0)
   precioOferta?: number
 
+  @ApiProperty({ required: false, example: 350.00, description: 'Precio 1 — uso flexible según agente' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  precio1?: number
+
+  @ApiProperty({ required: false, example: 330.00, description: 'Precio 2 — uso flexible según agente' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  precio2?: number
+
+  @ApiProperty({ required: false, example: 310.00, description: 'Precio 3 — uso flexible según agente' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  precio3?: number
+
   @ApiProperty({ required: false, example: 'PEN', description: 'Código de moneda: PEN, USD, etc.' })
   @IsOptional()
   @IsString()
